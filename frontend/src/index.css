@@ -74,6 +74,34 @@
   }
 }
 
+/*
+  Native <select> is rendered by the OS in Safari/WebKit, which ignores most
+  box styling (vertical padding, height, border-radius) and caps the control
+  height — so selects looked cramped there while Chrome honoured the padding.
+  Opt out of native rendering and draw our own chevron so every browser gets
+  the same sized control.
+
+  Left unlayered (not in @layer base) so `padding-right` here wins over the
+  `px-*` utilities the components set; only `background-image` is touched, so
+  Tailwind `bg-white` / `bg-slate-50` colour utilities still apply.
+*/
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem;
+  padding-right: 2.25rem;
+  line-height: 1.35;
+}
+
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Custom modern utilities */
 .glass-panel {
   background: rgba(255, 255, 255, 0.85);

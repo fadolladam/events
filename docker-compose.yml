@@ -1,0 +1,74 @@
+name: events
+
+services:
+  # Database Service (MySQL 8.0)
+  events-db:
+    image: mysql:8.0
+    container_name: events-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-events}
+      MYSQL_USER: ${DB_USERNAME:-events_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-events_secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - events_db_data:/var/lib/mysql
+    networks:
+      - events-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Backend Service (Laravel API)
+  events-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: events-backend
+    restart: unless-stopped
+    depends_on:
+      events-db:
+        condition: service_healthy
+    environment:
+      APP_NAME: EventNex
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:5173
+      APP_KEY: ${APP_KEY:-base64:wnh/yffjXI0yCTyAuOAVUL6wS+0a+Xn5cOFTO3tWBFc=}
+      DB_CONNECTION: mysql
+      DB_HOST: events-db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-events}
+      DB_USERNAME: ${DB_USERNAME:-events_user}
+      DB_PASSWORD: ${DB_PASSWORD:-events_secret}
+    ports:
+      - "8000:8000"
+    networks:
+      - events-network
+
+  # Frontend Service (React SPA + Nginx Reverse Proxy)
+  events-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: events-frontend
+    restart: unless-stopped
+    depends_on:
+      - events-backend
+    ports:
+      - "5173:80"
+      - "8080:80"
+    networks:
+      - events-network
+
+volumes:
+  events_db_data:
+    name: events_db_data
+
+networks:
+  events-network:
+    name: events-network

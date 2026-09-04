@@ -1,0 +1,23 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Dependencies & build output (also covered by frontend/ and backend/ .gitignore)
+node_modules/
+vendor/
+dist/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.sqlite
+*.sqlite-journal
+
+# Logs
+*.log

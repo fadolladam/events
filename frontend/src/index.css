@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/*
+  RHB Banking Group corporate palette (official brand guide values).
+
+    RHB Blue        #0067B1  (PMS 293 C)  — primary
+    RHB Red         #EF3E42  (PMS 185 C)  — sub / accent / destructive
+    RHB Light Blue  #5BC2E7  (PMS 2985 C) — secondary / "morning sky blue"
+    + black / white
+
+  The app was authored with Tailwind's `indigo` scale as the primary colour and
+  `red` for destructive actions, so we remap those scales (plus `sky`) to the RHB
+  values here — every existing utility class then renders on-brand with no churn.
+*/
+@theme {
+  /* ---- Primary: RHB Blue #0067B1 (mapped onto `indigo-*`) ---- */
+  --color-indigo-50: #e6f1f8;
+  --color-indigo-100: #c3ddef;
+  --color-indigo-200: #94c4e2;
+  --color-indigo-300: #5aa8d3;
+  --color-indigo-400: #2688c2;
+  --color-indigo-500: #0a75b6;
+  --color-indigo-600: #0067b1;
+  --color-indigo-700: #005795;
+  --color-indigo-800: #0a4a79;
+  --color-indigo-900: #0d3e63;
+  --color-indigo-950: #082741;
+
+  /* ---- Secondary: RHB Light Blue #5BC2E7 (mapped onto `sky-*`) ---- */
+  --color-sky-50: #eef9fd;
+  --color-sky-100: #d6f1fa;
+  --color-sky-200: #b0e5f5;
+  --color-sky-300: #7ed3ee;
+  --color-sky-400: #5bc2e7;
+  --color-sky-500: #34abd4;
+  --color-sky-600: #2389b4;
+  --color-sky-700: #206e91;
+  --color-sky-800: #205c78;
+  --color-sky-900: #1e4d64;
+  --color-sky-950: #0f3143;
+
+  /* ---- Sub / destructive: RHB Red #EF3E42 (mapped onto `red-*`) ---- */
+  --color-red-50: #fdeded;
+  --color-red-100: #fbdcdd;
+  --color-red-200: #f7bdbe;
+  --color-red-300: #f29294;
+  --color-red-400: #f16265;
+  --color-red-500: #ef3e42;
+  --color-red-600: #db2a2e;
+  --color-red-700: #b81f23;
+  --color-red-800: #981d20;
+  --color-red-900: #7e1e20;
+  --color-red-950: #450b0c;
+
+  /* ---- Named RHB tokens for brand surfaces ---- */
+  --color-rhb-blue: #0067b1;
+  --color-rhb-red: #ef3e42;
+  --color-rhb-light: #5bc2e7;
+  --color-rhb: #0067b1;
+  --color-rhb-navy: #083a5e;   /* deep RHB blue — dark sidebars / login */
+  --color-rhb-deep: #062741;
+}
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #f1f5f9;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom modern utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

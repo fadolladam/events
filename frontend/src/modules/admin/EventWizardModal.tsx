@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, EventAttachment, EventCategory, EventItem } from '../../services/api';
+import { ImageUploadField } from '../../components/ImageUploadField';
 import { X, ArrowRight, ArrowLeft, Check, Calendar, MapPin, Users, ShieldAlert, Sparkles, Plus, Trash2, Image as ImageIcon, Paperclip } from 'lucide-react';
 
 interface EventWizardModalProps {
@@ -194,25 +195,14 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
               {/* Cover / Thumbnail image */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  <span className="inline-flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> Cover Image / Thumbnail URL</span>
+                  <span className="inline-flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> Cover Image / Thumbnail</span>
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://… (paste an image link)"
+                <ImageUploadField
                   value={coverImageUrl}
-                  onChange={(e) => setCoverImageUrl(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onChange={setCoverImageUrl}
+                  folder="event-covers"
+                  helpText="Shown on the event card and detail page. Leave blank to use an auto-generated RHB placeholder."
                 />
-                {coverImageUrl.trim() ? (
-                  <img
-                    src={coverImageUrl}
-                    alt="Cover preview"
-                    className="mt-2 h-28 w-full max-w-xs rounded-xl object-cover border border-slate-200"
-                    onError={(e) => { (e.currentTarget.style.display = 'none'); }}
-                  />
-                ) : (
-                  <p className="text-[10px] text-slate-400 mt-1">Shown on the event card and detail page. Leave blank to use an auto-generated RHB placeholder.</p>
-                )}
               </div>
 
               {/* Supporting documents / attachments */}

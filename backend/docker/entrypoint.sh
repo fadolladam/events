@@ -52,6 +52,13 @@ if [ "$DB_CONNECTION" = "mysql" ]; then
   echo "MySQL is up and available."
 fi
 
+# Public storage symlink (for device-uploaded images served at /storage/*)
+if [ ! -e public/storage ]; then
+  php artisan storage:link || true
+fi
+mkdir -p storage/app/public/event-covers storage/app/public/event-banners
+chmod -R 775 storage/app/public || true
+
 # Run database migrations and seeders
 echo "Running database migrations..."
 php artisan migrate --force

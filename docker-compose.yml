@@ -47,6 +47,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-events_secret}
     ports:
       - "8000:8000"
+    volumes:
+      # Persist device-uploaded images across container rebuilds
+      - events_backend_uploads:/var/www/html/storage/app/public
     networks:
       - events-network
 
@@ -68,6 +71,8 @@ services:
 volumes:
   events_db_data:
     name: events_db_data
+  events_backend_uploads:
+    name: events_backend_uploads
 
 networks:
   events-network:

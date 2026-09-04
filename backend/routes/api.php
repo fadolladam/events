@@ -8,6 +8,7 @@ use App\Modules\Events\EventCategoryController;
 use App\Modules\Events\EventController;
 use App\Modules\Events\EventTemplateController;
 use App\Modules\Forms\FormBuilderController;
+use App\Modules\Media\MediaController;
 use App\Modules\Notifications\NotificationController;
 use App\Modules\Registration\RegistrationController;
 use App\Modules\Reports\ReportController;
@@ -89,6 +90,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::post('/categories', [EventCategoryController::class, 'store']);
         Route::post('/templates', [EventTemplateController::class, 'store']);
+
+        Route::post('/media/upload', [MediaController::class, 'uploadImage'])->middleware('throttle:30,1');
 
         Route::put('/events/{eventId}/form', [FormBuilderController::class, 'update']);
 

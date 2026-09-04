@@ -76,6 +76,23 @@ export const getStoredUser = (): User | null => {
   }
 };
 
+/**
+ * Upload an image file from the user's device. Returns a root-relative URL
+ * (e.g. "/storage/event-covers/uuid.png") suitable for `cover_image_url`.
+ */
+export const uploadImage = async (
+  file: File,
+  folder: 'event-covers' | 'event-banners' = 'event-covers'
+): Promise<string> => {
+  const data = new FormData();
+  data.append('file', file);
+  data.append('folder', folder);
+  const res = await apiClient.post('/media/upload', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.url as string;
+};
+
 export interface EventAttachment {
   label: string;
   url: string;

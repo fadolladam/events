@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, EventAttachment, EventCategory, EventItem } from '../../services/api';
+import { ImageUploadField } from '../../components/ImageUploadField';
 import { X, Save, CheckCircle2, Plus, Trash2, Image as ImageIcon, Paperclip } from 'lucide-react';
 
 interface EventSettingsModalProps {
@@ -180,11 +181,12 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
               </div>
 
               <div>
-                <label className={lbl}><span className="inline-flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> Cover Image / Thumbnail URL</span></label>
-                <input type="url" className={field} placeholder="https://…" value={form.cover_image_url} onChange={(e) => set({ cover_image_url: e.target.value })} />
-                {form.cover_image_url.trim() && (
-                  <img src={form.cover_image_url} alt="" className="mt-2 h-28 w-full max-w-xs rounded-xl object-cover border border-slate-200" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                )}
+                <label className={lbl}><span className="inline-flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> Cover Image / Thumbnail</span></label>
+                <ImageUploadField
+                  value={form.cover_image_url}
+                  onChange={(url) => set({ cover_image_url: url })}
+                  folder="event-covers"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

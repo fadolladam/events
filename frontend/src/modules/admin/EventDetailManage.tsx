@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 
 interface EventDetailManageProps {
@@ -39,6 +41,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [expandedRegId, setExpandedRegId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const role = getStoredUser()?.role;
@@ -274,6 +277,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 uppercase font-bold text-[10px]">
+                  <th className="py-3 px-4 w-8"></th>
                   <th className="py-3 px-4">Permanent Reg #</th>
                   <th className="py-3 px-4">Name</th>
                   <th className="py-3 px-4">Email</th>
@@ -285,33 +289,94 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {registrations.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">No registrations recorded yet.</td>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">No registrations recorded yet.</td>
                   </tr>
                 ) : (
-                  registrations.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50/80">
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{r.registration_number}</td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-900">{r.participant.name}</td>
-                      <td className="py-3.5 px-4 text-slate-500">{r.participant.email}</td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                            r.status === 'confirmed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : r.status === 'waitlisted'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
+                  registrations.map((r) => {
+                    const isOpen = expandedRegId === r.id;
+                    const answers = r.answers || [];
+                    const answerLabels = new Set(
+                      answers.map((a) => (a.field_label || a.field_key).toLowerCase())
+                    );
+                    // Don't repeat a participant field that's also a form answer.
+                    const extras: [string, string | undefined][] = (
+                      [
+                        ['Phone', r.participant.phone],
+                        ['Employee ID', r.participant.employee_id],
+                        ['Department', r.participant.department],
+                        ['Country', r.participant.country],
+                      ] as [string, string | undefined][]
+                    ).filter(([label]) => !answerLabels.has(label.toLowerCase()));
+                    return (
+                      <React.Fragment key={r.id}>
+                        <tr
+                          className="hover:bg-slate-50/80 cursor-pointer"
+                          onClick={() => setExpandedRegId(isOpen ? null : r.id)}
                         >
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 uppercase text-[10px] font-semibold text-slate-600">
-                        {r.attendance_status.replace('_', ' ')}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-400">{new Date(r.registered_at).toLocaleDateString()}</td>
-                    </tr>
-                  ))
+                          <td className="py-3.5 px-4 text-slate-400">
+                            {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{r.registration_number}</td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-900">{r.participant.name}</td>
+                          <td className="py-3.5 px-4 text-slate-500">{r.participant.email}</td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                r.status === 'confirmed'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : r.status === 'waitlisted'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 uppercase text-[10px] font-semibold text-slate-600">
+                            {r.attendance_status.replace('_', ' ')}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400">{new Date(r.registered_at).toLocaleDateString()}</td>
+                        </tr>
+
+                        {isOpen && (
+                          <tr className="bg-slate-50/60">
+                            <td colSpan={7} className="px-4 py-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                                {extras
+                                  .filter(([, v]) => v)
+                                  .map(([label, v]) => (
+                                    <div key={label} className="flex flex-col">
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+                                      <span className="text-slate-800 font-medium">{v}</span>
+                                    </div>
+                                  ))}
+
+                                {answers.map((a) => {
+                                  const val = Array.isArray(a.value_json)
+                                    ? a.value_json.join(', ')
+                                    : a.value_json != null
+                                    ? JSON.stringify(a.value_json)
+                                    : a.value_text;
+                                  return (
+                                    <div key={a.field_key} className="flex flex-col">
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                        {a.field_label || a.field_key}
+                                      </span>
+                                      <span className="text-slate-800 font-medium break-words">{val || '—'}</span>
+                                    </div>
+                                  );
+                                })}
+
+                                {extras.every(([, v]) => !v) && answers.length === 0 && (
+                                  <span className="text-slate-400 italic">No additional registration answers.</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
                 )}
               </tbody>
             </table>

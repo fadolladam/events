@@ -40,6 +40,10 @@ class RegistrationService
                 ]);
             }
 
+            // 1b. Validate submitted answers against the event's live form schema
+            //     (frontend "required" checks must not be trusted on their own).
+            $this->validateFormAnswers($event, $formAnswers);
+
             // 2. Duplicate Detection
             $this->checkDuplicateRegistration($event, $participantData);
 
@@ -241,6 +245,56 @@ class RegistrationService
 
             return $registration->fresh(['participant', 'ticket']);
         });
+    }
+
+    /**
+     * Server-side validation of dynamic form answers against the event's
+     * current (non-hidden) form fields. Mirrors what the public wizard renders.
+     *
+     * $formAnswers is keyed by field_key => ['label' => ..., 'value' => mixed].
+     */
+    protected function validateFormAnswers(Event $event, array $formAnswers): void
+    {
+        $form = $event->form()->with('fields')->first();
+        if (!$form) {
+            return;
+        }
+
+        // Name / email / phone are collected by dedicated inputs, not the
+        // dynamic answers payload, so they are validated by the controller.
+        $coreKeys = ['full_name', 'email', 'phone'];
+        $errors = [];
+
+        foreach ($form->fields as $field) {
+            if ($field->is_hidden || in_array($field->field_key, $coreKeys, true)) {
+                continue;
+            }
+
+            $answer = $formAnswers[$field->field_key]['value'] ?? null;
+            $isEmpty = $answer === null || $answer === '' || (is_array($answer) && count($answer) === 0);
+
+            if ($field->is_required && $isEmpty) {
+                $errors[$field->field_key] = ["{$field->label} is required."];
+                continue;
+            }
+
+            if ($isEmpty) {
+                continue;
+            }
+
+            // Constrain choice fields to their configured options.
+            if (in_array($field->type, ['select', 'radio', 'checkbox'], true) && !empty($field->options)) {
+                $submitted = is_array($answer) ? $answer : [$answer];
+                $invalid = array_diff($submitted, $field->options);
+                if (!empty($invalid)) {
+                    $errors[$field->field_key] = ["\"{$field->label}\" has an invalid selection."];
+                }
+            }
+        }
+
+        if (!empty($errors)) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     /**

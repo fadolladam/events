@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { EventItem, User } from './services/api';
+import { EventItem, User, ROLE_TIERS, hasRole } from './services/api';
 import { LoginPage } from './modules/auth/LoginPage';
 import { PublicEventsCatalog } from './modules/public/PublicEventsCatalog';
 import { PublicEventDetail } from './modules/public/PublicEventDetail';
@@ -135,10 +135,15 @@ export const App: React.FC = () => {
 
   // 6. ADMIN SYSTEM
   if (currentView === 'admin' && user) {
+    // Guard against a role that cannot see the currently-selected section
+    // (e.g. stale state, or a role change) — fall back to the dashboard.
+    const canViewAudit = hasRole(user.role, ROLE_TIERS.governance);
+    const safeNav = adminNav === 'audit' && !canViewAudit ? 'dashboard' : adminNav;
+
     return (
       <AdminLayout
         user={user}
-        activeNav={adminNav}
+        activeNav={safeNav}
         onNavigate={(nav) => {
           setAdminNav(nav);
           setAdminSelectedEventId(null);
@@ -146,7 +151,7 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
         onSwitchToPublic={() => setCurrentView('public_catalog')}
       >
-        {adminNav === 'dashboard' && (
+        {safeNav === 'dashboard' && (
           <GlobalDashboard
             onNavigateToEvents={() => {
               setAdminNav('events');
@@ -157,7 +162,7 @@ export const App: React.FC = () => {
           />
         )}
 
-        {adminNav === 'events' && (
+        {safeNav === 'events' && (
           adminSelectedEventId ? (
             <EventDetailManage
               eventId={adminSelectedEventId}
@@ -172,7 +177,7 @@ export const App: React.FC = () => {
           )
         )}
 
-        {adminNav === 'audit' && <AuditLogsPage />}
+        {safeNav === 'audit' && canViewAudit && <AuditLogsPage />}
 
         <EventWizardModal
           isOpen={wizardOpen}

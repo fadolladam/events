@@ -35,14 +35,46 @@ apiClient.interceptors.response.use(
 );
 
 /* Type definitions */
+export type UserRole =
+  | 'super_admin'
+  | 'event_admin'
+  | 'event_organizer'
+  | 'registration_officer'
+  | 'checkin_staff'
+  | 'viewer'
+  | 'participant';
+
 export interface User {
   id: number;
   name: string;
   email: string;
-  role: 'super_admin' | 'event_admin' | 'event_organizer' | 'registration_officer' | 'checkin_staff' | 'viewer' | 'participant';
+  role: UserRole;
   phone?: string;
   organization?: { id: number; name: string };
 }
+
+/**
+ * Frontend mirror of the backend route role tiers (routes/api.php).
+ * super_admin is included everywhere it implicitly passes on the server.
+ */
+export const ROLE_TIERS = {
+  staff: ['super_admin', 'event_admin', 'event_organizer', 'registration_officer', 'checkin_staff', 'viewer'],
+  eventManager: ['super_admin', 'event_admin', 'event_organizer'],
+  registration: ['super_admin', 'event_admin', 'event_organizer', 'registration_officer'],
+  checkin: ['super_admin', 'event_admin', 'event_organizer', 'registration_officer', 'checkin_staff'],
+  governance: ['super_admin', 'event_admin'],
+} as const;
+
+export const hasRole = (role: string | undefined | null, allowed: readonly string[]): boolean =>
+  !!role && allowed.includes(role);
+
+export const getStoredUser = (): User | null => {
+  try {
+    return JSON.parse(localStorage.getItem('rhb_events_user') || 'null');
+  } catch {
+    return null;
+  }
+};
 
 export interface EventAttachment {
   label: string;

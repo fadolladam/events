@@ -14,13 +14,20 @@ sync_env() {
   key="$1"
   val="$2"
   [ -z "$val" ] && return 0
+  # Quote values containing a space so dotenv keeps them intact.
+  case "$val" in
+    *" "*) val="\"${val}\"" ;;
+  esac
   if grep -q "^${key}=" .env; then
     sed -i "s|^${key}=.*|${key}=${val}|" .env
   else
     echo "${key}=${val}" >> .env
   fi
 }
+sync_env APP_NAME "$APP_NAME"
 sync_env APP_ENV "$APP_ENV"
+sync_env CORS_ALLOWED_ORIGINS "$CORS_ALLOWED_ORIGINS"
+sync_env SANCTUM_TOKEN_EXPIRATION "$SANCTUM_TOKEN_EXPIRATION"
 sync_env APP_DEBUG "$APP_DEBUG"
 sync_env APP_URL "$APP_URL"
 sync_env DB_CONNECTION "$DB_CONNECTION"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiClient, EventItem, Registration } from '../../services/api';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, Clock, Ticket, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
@@ -20,6 +20,28 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The event passed in from the catalog list does NOT include the dynamic
+  // registration form (`form.fields`) — the list endpoint omits it. Fetch the
+  // full event by slug so custom questions (dropdowns, radios, checkboxes…)
+  // and fresh capacity counts are available here.
+  const [fullEvent, setFullEvent] = useState<EventItem>(event);
+
+  useEffect(() => {
+    if (!event.slug) return;
+    let cancelled = false;
+    apiClient
+      .get(`/public/events/${event.slug}`)
+      .then((res) => {
+        if (!cancelled) setFullEvent(res.data);
+      })
+      .catch(() => {
+        /* keep the prop as-is if the detail fetch fails */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [event.slug]);
+
   // Standard Participant fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -38,7 +60,7 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
     ticket_token?: string | null;
   } | null>(null);
 
-  const formFields = event.form?.fields || [];
+  const formFields = fullEvent.form?.fields || [];
 
   const handleCustomFieldChange = (fieldKey: string, fieldLabel: string, value: any) => {
     setCustomAnswers((prev) => ({

@@ -1,23 +1,29 @@
 import React from 'react';
-import { User } from '../services/api';
+import { User, ROLE_TIERS, hasRole } from '../services/api';
 import {
   LayoutDashboard,
   Calendar,
   ShieldCheck,
   LogOut,
   ExternalLink,
-  Users,
-  Layers,
 } from 'lucide-react';
+
+export type AdminNav = 'dashboard' | 'events' | 'audit';
 
 interface AdminLayoutProps {
   user: User;
-  activeNav: 'dashboard' | 'events' | 'audit';
-  onNavigate: (nav: 'dashboard' | 'events' | 'audit') => void;
+  activeNav: AdminNav;
+  onNavigate: (nav: AdminNav) => void;
   onLogout: () => void;
   onSwitchToPublic: () => void;
   children: React.ReactNode;
 }
+
+const NAV_ITEMS: { key: AdminNav; label: string; icon: typeof LayoutDashboard; allow: readonly string[] }[] = [
+  { key: 'dashboard', label: 'Overview Dashboard', icon: LayoutDashboard, allow: ROLE_TIERS.staff },
+  { key: 'events', label: 'Events & Operations', icon: Calendar, allow: ROLE_TIERS.staff },
+  { key: 'audit', label: 'System Audit Trails', icon: ShieldCheck, allow: ROLE_TIERS.governance },
+];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   user,
@@ -33,55 +39,39 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <aside className="w-full md:w-64 bg-rhb-navy text-slate-200 border-r border-white/10 flex flex-col justify-between shrink-0">
         <div>
           {/* Brand Logo */}
-          <div className="p-6 border-b border-white/10 flex items-center justify-between">
+          <div className="px-5 py-5 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="bg-white rounded-lg px-2 py-1.5 flex items-center shadow-md">
-                <img src="/rhb-logo.png" alt="RHB" className="h-5 w-auto" />
+              <div className="bg-white rounded-xl px-3 py-2 flex items-center shadow-md shrink-0">
+                <img src="/rhb-logo.png" alt="RHB Bank" className="h-6 w-auto" />
               </div>
-              <div>
-                <span className="font-bold text-white tracking-tight">Events</span>
-                <span className="block text-[10px] text-sky-300 font-mono">INTERNAL ADMIN</span>
+              <div className="leading-tight">
+                <span className="block text-sm font-bold text-white tracking-tight">Events</span>
+                <span className="block text-[10px] text-sky-300 font-semibold tracking-[0.12em] whitespace-nowrap">
+                  INTERNAL ADMIN
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Navigation Links */}
+          {/* Navigation Links — filtered by the signed-in user's role */}
           <nav className="p-4 space-y-1.5 text-xs font-semibold">
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
-                activeNav === 'dashboard'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Overview Dashboard</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('events')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
-                activeNav === 'events'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Events & Operations</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('audit')}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
-                activeNav === 'audit'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>System Audit Trails</span>
-            </button>
+            {NAV_ITEMS.filter((item) => hasRole(user.role, item.allow)).map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => onNavigate(item.key)}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                    activeNav === item.key
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
 

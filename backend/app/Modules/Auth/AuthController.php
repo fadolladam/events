@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Modules\Audit\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -37,8 +38,11 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'phone' => 'nullable|string|max:50',
-            'role' => 'nullable|string|in:super_admin,event_admin,event_organizer,registration_officer,checkin_staff,viewer,participant',
         ]);
+
+        // Public self-service accounts are ALWAYS participants. Staff accounts
+        // (any privileged role) are created only via storeUser() by an admin.
+        $validated['role'] = 'participant';
 
         $result = $this->authService->register($validated);
 
@@ -47,6 +51,46 @@ class AuthController extends Controller
             'user' => $result['user'],
             'token' => $result['token'],
         ], 201);
+    }
+
+    /**
+     * Admin-only creation of staff accounts with an explicit role.
+     * Route-guarded to super_admin / event_admin.
+     */
+    public function storeUser(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'phone' => 'nullable|string|max:50',
+            'role' => 'required|string|in:super_admin,event_admin,event_organizer,registration_officer,checkin_staff,viewer,participant',
+        ]);
+
+        // Only a super_admin may mint another super_admin.
+        if ($validated['role'] === 'super_admin' && $request->user()->role !== 'super_admin') {
+            return response()->json([
+                'message' => 'Only a super admin can create another super admin.',
+            ], 403);
+        }
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role' => $validated['role'],
+            'phone' => $validated['phone'] ?? null,
+            'status' => 'active',
+        ]);
+
+        AuditService::log(
+            action: 'user_created',
+            entityType: 'User',
+            entityId: (string) $user->id,
+            newValue: ['email' => $user->email, 'role' => $user->role]
+        );
+
+        return response()->json(['user' => $user], 201);
     }
 
     public function me(Request $request): JsonResponse

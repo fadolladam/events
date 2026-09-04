@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiClient, EventItem, Registration } from '../../services/api';
+import { apiClient, EventItem, Registration, getStoredUser, ROLE_TIERS, hasRole } from '../../services/api';
 import { QrScannerConsole } from '../checkin/QrScannerConsole';
 import { WaitlistQueuePage } from '../queue/WaitlistQueuePage';
 import { AttendanceRoster } from '../attendance/AttendanceRoster';
@@ -40,6 +40,11 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const role = getStoredUser()?.role;
+  const canManage = hasRole(role, ROLE_TIERS.eventManager);
+  const canRegistrations = hasRole(role, ROLE_TIERS.registration);
+  const canCheckin = hasRole(role, ROLE_TIERS.checkin);
 
   useEffect(() => {
     fetchEvent();
@@ -82,16 +87,16 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
     return <div className="p-8 text-center text-xs text-slate-400">Loading event management dashboard...</div>;
   }
 
-  // Render dedicated sub-screens if active
-  if (activeTab === 'checkin') {
+  // Render dedicated sub-screens if active (role-gated — mirrors routes/api.php)
+  if (activeTab === 'checkin' && canCheckin) {
     return <QrScannerConsole eventId={eventId} onBack={() => setActiveTab('overview')} />;
   }
 
-  if (activeTab === 'queue') {
+  if (activeTab === 'queue' && canRegistrations) {
     return <WaitlistQueuePage eventId={eventId} onBack={() => setActiveTab('overview')} />;
   }
 
-  if (activeTab === 'attendance') {
+  if (activeTab === 'attendance' && canCheckin) {
     return <AttendanceRoster eventId={eventId} onBack={() => setActiveTab('overview')} />;
   }
 
@@ -119,96 +124,62 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
           </div>
         </div>
 
-        {/* Status Toggle Dropdown */}
+        {/* Status Toggle Dropdown — editable only for event managers */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 font-semibold">Event Status:</span>
-          <select
-            value={event.status}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold uppercase bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="draft">Draft</option>
-            <option value="upcoming">Upcoming</option>
-            <option value="registration_open">Registration Open</option>
-            <option value="full">Full</option>
-            <option value="registration_closed">Registration Closed</option>
-            <option value="ongoing">Ongoing</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="archived">Archived</option>
-          </select>
+          {canManage ? (
+            <select
+              value={event.status}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold uppercase bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="draft">Draft</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="registration_open">Registration Open</option>
+              <option value="full">Full</option>
+              <option value="registration_closed">Registration Closed</option>
+              <option value="ongoing">Ongoing</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="archived">Archived</option>
+            </select>
+          ) : (
+            <span className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold uppercase text-slate-600">
+              {event.status.replace('_', ' ')}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation — filtered by the signed-in user's role */}
       <div className="flex border-b border-slate-200 gap-6 text-xs font-bold overflow-x-auto pb-px custom-scrollbar">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`pb-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-all ${
-            activeTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          <span>Overview</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('registrations')}
-          className={`pb-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-all ${
-            activeTab === 'registrations' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Registrations</span>
-        </button>
-
-        <button
-          onClick={() => setFormModalOpen(true)}
-          className="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 flex items-center gap-1.5 whitespace-nowrap transition-all"
-        >
-          <FileEdit className="w-4 h-4" />
-          <span>Form Builder</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('queue')}
-          className="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 flex items-center gap-1.5 whitespace-nowrap transition-all"
-        >
-          <Clock className="w-4 h-4" />
-          <span>Queue & Waitlist ({event.waitlist_count || 0})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('checkin')}
-          className="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 flex items-center gap-1.5 whitespace-nowrap transition-all"
-        >
-          <QrCode className="w-4 h-4" />
-          <span>QR Check-In Console</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('attendance')}
-          className="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 flex items-center gap-1.5 whitespace-nowrap transition-all"
-        >
-          <CheckSquare className="w-4 h-4" />
-          <span>Attendance Roster</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('reports')}
-          className="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 flex items-center gap-1.5 whitespace-nowrap transition-all"
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>Analytics & Reports</span>
-        </button>
-
-        <button
-          onClick={() => setSettingsModalOpen(true)}
-          className="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 flex items-center gap-1.5 whitespace-nowrap transition-all"
-        >
-          <Settings className="w-4 h-4" />
-          <span>Settings</span>
-        </button>
+        {[
+          { key: 'overview', label: 'Overview', icon: LayoutDashboard, show: true, onClick: () => setActiveTab('overview') },
+          { key: 'registrations', label: 'Registrations', icon: Users, show: canRegistrations, onClick: () => setActiveTab('registrations') },
+          { key: 'form', label: 'Form Builder', icon: FileEdit, show: canManage, onClick: () => setFormModalOpen(true) },
+          { key: 'queue', label: `Queue & Waitlist (${event.waitlist_count || 0})`, icon: Clock, show: canRegistrations, onClick: () => setActiveTab('queue') },
+          { key: 'checkin', label: 'QR Check-In Console', icon: QrCode, show: canCheckin, onClick: () => setActiveTab('checkin') },
+          { key: 'attendance', label: 'Attendance Roster', icon: CheckSquare, show: canCheckin, onClick: () => setActiveTab('attendance') },
+          { key: 'reports', label: 'Analytics & Reports', icon: BarChart3, show: true, onClick: () => setActiveTab('reports') },
+          { key: 'settings', label: 'Settings', icon: Settings, show: canManage, onClick: () => setSettingsModalOpen(true) },
+        ]
+          .filter((t) => t.show)
+          .map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={t.onClick}
+                className={`pb-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-all ${
+                  isActive ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
       </div>
 
       {/* OVERVIEW TAB */}
@@ -255,6 +226,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
             </p>
 
             <div className="flex flex-wrap gap-3 pt-2">
+              {canCheckin && (
               <button
                 onClick={() => setActiveTab('checkin')}
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-2 transition-all"
@@ -262,7 +234,9 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
                 <QrCode className="w-4 h-4" />
                 <span>Launch QR Check-In Console</span>
               </button>
+              )}
 
+              {canRegistrations && (
               <button
                 onClick={() => setActiveTab('queue')}
                 className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-2 transition-all"
@@ -270,7 +244,9 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
                 <Clock className="w-4 h-4 text-amber-400" />
                 <span>Manage FIFO Waitlist Queue</span>
               </button>
+              )}
 
+              {canManage && (
               <button
                 onClick={() => setFormModalOpen(true)}
                 className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-2 transition-all"
@@ -278,6 +254,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
                 <FileEdit className="w-4 h-4 text-emerald-400" />
                 <span>Edit Registration Questions</span>
               </button>
+              )}
             </div>
           </div>
         </div>

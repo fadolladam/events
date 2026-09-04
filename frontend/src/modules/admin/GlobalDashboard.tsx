@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiClient, EventItem, Registration } from '../../services/api';
+import { apiClient, EventItem, Registration, getStoredUser, ROLE_TIERS, hasRole } from '../../services/api';
 import { Calendar, Users, CheckCircle2, Clock, ArrowRight, TrendingUp, Plus, ShieldAlert, FileText, QrCode } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
 
@@ -16,6 +16,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
 }) => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const canManage = hasRole(getStoredUser()?.role, ROLE_TIERS.eventManager);
 
   useEffect(() => {
     fetchStats();
@@ -54,15 +56,17 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({
           <p className="text-xs text-slate-500 mt-1">Multi-event administration & live operations control center.</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onCreateEvent}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Event</span>
-          </button>
-        </div>
+        {canManage && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onCreateEvent}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Event</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* KPI Cards Grid */}

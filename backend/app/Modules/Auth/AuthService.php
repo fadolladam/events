@@ -46,7 +46,8 @@ class AuthService
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'role' => $data['role'] ?? 'participant',
+            // Self-service registration can never assign a privileged role.
+            'role' => 'participant',
             'phone' => $data['phone'] ?? null,
             'organization_id' => $data['organization_id'] ?? null,
             'status' => 'active',

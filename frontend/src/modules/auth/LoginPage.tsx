@@ -52,8 +52,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onCancel }
     <div className="min-h-screen bg-rhb-navy text-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-slate-900/80 border border-white/10 rounded-2xl shadow-2xl p-8 backdrop-blur-xl">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center px-4 py-3 rounded-2xl bg-white mb-3 shadow-lg">
-            <img src="/rhb-logo.png" alt="RHB" className="h-8 w-auto" />
+          <div className="inline-flex items-center justify-center px-5 py-3.5 rounded-2xl bg-white mb-3 shadow-lg">
+            <img src="/rhb-logo.png" alt="RHB Bank" className="h-9 w-auto" />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Events Portal</h1>
           <p className="text-sm text-slate-400 mt-1">RHB Internal Events Administration</p>

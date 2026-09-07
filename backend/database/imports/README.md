@@ -15,10 +15,28 @@ docker compose exec events-backend \
 - Rows fill **confirmed** seats up to the event capacity; extra rows go on the
   **waitlist in file order**. For Angkor Wat (capacity 79): put your 79 confirmed
   runners first, then the 3 waitlisted ones — they become waitlist #1, #2, #3.
-- Duplicate emails are rejected (the event's duplicate rule is `email`).
 - Confirmed rows get a QR ticket automatically.
-- `registered_at` is set to the import time (the importer can't backdate it).
 - `--source` sets `registrations.source` (default `import`).
+- **Never commit a filled-in file** — this folder's `.gitignore` keeps only the
+  template and this README.
+
+### Extra recognised columns (all optional)
+
+| Column | Effect |
+|---|---|
+| `staff_id` / `employee_id` | stored on the participant as `employee_id` |
+| `department`, `country`, `organization` | stored on the participant |
+| `registered_at` | back-dates the registration (and its confirmed/waitlisted timestamp). Any parseable date, e.g. `26 Jun 2026 01:55:14 PM` |
+| `queue` | row order only — ignored as data |
+
+If a row has **no `email`**, a placeholder `<code>-<queue>@<code>.import` is
+generated (unique per row), so people with a missing or duplicated `staff_id`
+still import cleanly. Choice values are matched loosely — e.g. t-shirt `2XL`
+maps to `XXL`; a checkbox (`waiver`) counts as accepted unless the cell says
+`no`/`false`/`0`.
+
+Use `--dry-run` first — it reports duplicate keys, unknown option values, and
+missing required fields without writing anything.
 
 ## Columns for `angkor-wat-half-marathon-2026`
 

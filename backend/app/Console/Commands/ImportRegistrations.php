@@ -3,8 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Models\Event;
+use App\Models\Registration;
+use App\Models\WaitlistHistory;
 use App\Modules\Registration\RegistrationService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -56,7 +59,10 @@ class ImportRegistrations extends Command
             ? $form->fields->where('is_hidden', false)->keyBy('field_key')
             : collect();
         $coreKeys = ['full_name', 'email', 'phone'];
+        // CSV columns that describe the person, not a form answer.
+        $participantCols = ['staff_id' => 'employee_id', 'employee_id' => 'employee_id', 'department' => 'department', 'country' => 'country', 'organization' => 'organization'];
         $dryRun = (bool) $this->option('dry-run');
+        $emailDomain = strtolower($event->event_code) . '.import';
 
         $this->line("Event   : <info>{$event->title}</info>  ({$event->event_code})");
         $this->line('Capacity: ' . $event->capacity . ($event->waitlist_enabled ? " + waitlist {$event->waitlist_capacity}" : ' (no waitlist)'));
@@ -65,78 +71,110 @@ class ImportRegistrations extends Command
 
         $confirmed = $waitlisted = 0;
         $failures = [];
+        $seenEmails = [];
 
         foreach ($rows as $i => $row) {
             $line = $i + 2; // header is line 1
-            $email = trim((string) ($row['email'] ?? ''));
             $name = trim((string) ($row['full_name'] ?? ''));
-
-            if ($name === '' || $email === '') {
-                $failures[] = "row {$line}: full_name and email are required";
+            if ($name === '') {
+                $failures[] = "row {$line}: full_name is required";
                 continue;
             }
+
+            $employeeId = trim((string) ($row['staff_id'] ?? $row['employee_id'] ?? ''));
+
+            // No real email in the file → synthesise a placeholder keyed on the
+            // row's own `queue` number (or the line number) so it's always
+            // unique, even when two rows share a staff_id. The real staff_id is
+            // still stored on the participant as employee_id.
+            $email = trim((string) ($row['email'] ?? ''));
+            if ($email === '') {
+                $rowKey = trim((string) ($row['queue'] ?? '')) ?: (string) $line;
+                $email = strtolower($event->event_code) . '-' . preg_replace('/[^a-z0-9]+/i', '', $rowKey) . '@' . $emailDomain;
+            }
+            if (isset($seenEmails[$email])) {
+                $failures[] = "row {$line}: duplicate registration key of row {$seenEmails[$email]}";
+                continue;
+            }
+            $seenEmails[$email] = $line;
 
             $participant = [
                 'name' => $name,
                 'email' => $email,
                 'phone' => trim((string) ($row['phone'] ?? '')) ?: null,
             ];
+            foreach ($participantCols as $col => $field) {
+                if (($v = trim((string) ($row[$col] ?? ''))) !== '') {
+                    $participant[$field] = $v;
+                }
+            }
 
             $answers = [];
+            $rowErrors = [];
             foreach ($formFields as $key => $field) {
                 if (in_array($key, $coreKeys, true)) {
                     continue;
                 }
                 $raw = array_key_exists($key, $row) ? trim((string) $row[$key]) : '';
                 $isCheckbox = $field->type === 'checkbox' && ! empty($field->options);
+                $isChoice = in_array($field->type, ['select', 'radio'], true) && ! empty($field->options);
 
                 if ($isCheckbox) {
-                    // Accept on any truthy cell, or when the column is missing.
-                    $accepted = ! array_key_exists($key, $row)
-                        || in_array(strtolower($raw), ['1', 'y', 'yes', 'true', 'accept', 'accepted', 'agree', 'agreed', strtolower((string) $field->options[0])], true);
+                    // Historical import: treat a checkbox as accepted unless the
+                    // cell explicitly says otherwise.
+                    $accepted = ! in_array(strtolower($raw), ['0', 'n', 'no', 'false', 'declined', 'unchecked'], true);
                     if ($accepted) {
                         $answers[$key] = ['label' => $field->label, 'value' => $field->options[0]];
+                    } elseif ($field->is_required) {
+                        $rowErrors[] = "\"{$field->label}\" not accepted";
                     }
                     continue;
                 }
 
                 if ($raw === '') {
+                    if ($field->is_required) {
+                        $rowErrors[] = "\"{$field->label}\" is required but blank";
+                    }
                     continue;
+                }
+
+                if ($isChoice && ! in_array($raw, $field->options, true)) {
+                    $mapped = $this->matchOption($raw, $field->options);
+                    if ($mapped === null) {
+                        $rowErrors[] = "\"{$field->label}\" = \"{$raw}\" not in [" . implode(' | ', $field->options) . ']';
+                        continue;
+                    }
+                    $raw = $mapped;
                 }
                 $answers[$key] = ['label' => $field->label, 'value' => $raw];
             }
 
+            if ($rowErrors) {
+                $failures[] = "row {$line} ({$name}): " . implode('; ', $rowErrors);
+                continue;
+            }
+
             if ($dryRun) {
-                // Surface obvious problems without touching the DB.
-                foreach ($formFields as $key => $field) {
-                    if (in_array($key, $coreKeys, true) || ! $field->is_required) {
-                        continue;
-                    }
-                    $v = $answers[$key]['value'] ?? null;
-                    if ($v === null || $v === '') {
-                        $failures[] = "row {$line}: \"{$field->label}\" is required";
-                    } elseif (in_array($field->type, ['select', 'radio'], true) && ! empty($field->options) && ! in_array($v, $field->options, true)) {
-                        $failures[] = "row {$line}: \"{$field->label}\" = \"{$v}\" is not one of [" . implode(' | ', $field->options) . ']';
-                    }
-                }
                 continue;
             }
 
             try {
                 $result = $registrations->register($event->id, $participant, $answers, $this->option('source'));
-                $status = $result['registration']->status;
-                if ($status === 'confirmed') {
+                $reg = $result['registration'];
+                $this->backdate($reg, trim((string) ($row['registered_at'] ?? '')));
+
+                if ($reg->status === 'confirmed') {
                     $confirmed++;
-                } elseif ($status === 'waitlisted') {
+                } elseif ($reg->status === 'waitlisted') {
                     $waitlisted++;
-                    $this->line("  <comment>waitlist #{$result['queue_position']}</comment>  {$name} <{$email}>");
+                    $this->line("  <comment>waitlist #{$result['queue_position']}</comment>  {$name}");
                 } else {
-                    $failures[] = "row {$line}: created with unexpected status \"{$status}\"";
+                    $failures[] = "row {$line}: unexpected status \"{$reg->status}\"";
                 }
             } catch (ValidationException $e) {
-                $failures[] = "row {$line} ({$email}): " . implode('; ', array_map(fn ($m) => is_array($m) ? implode(', ', $m) : $m, $e->errors()));
+                $failures[] = "row {$line} ({$name}): " . implode('; ', array_map(fn ($m) => is_array($m) ? implode(', ', $m) : $m, $e->errors()));
             } catch (\Throwable $e) {
-                $failures[] = "row {$line} ({$email}): " . $e->getMessage();
+                $failures[] = "row {$line} ({$name}): " . $e->getMessage();
             }
         }
 
@@ -157,6 +195,58 @@ class ImportRegistrations extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /** Loosely match a CSV value to one of a choice field's options. */
+    private function matchOption(string $raw, array $options): ?string
+    {
+        $norm = fn (string $s) => strtoupper(preg_replace('/[^a-z0-9]+/i', '', $s));
+        $aliases = ['2XL' => 'XXL', 'XXLARGE' => 'XXL', 'XXXL' => '3XL', '3XLARGE' => '3XL', 'XLARGE' => 'XL', 'LARGE' => 'L', 'MEDIUM' => 'M', 'SMALL' => 'S', 'XSMALL' => 'XS'];
+
+        $r = $norm($raw);
+        $r = $aliases[$r] ?? $r;
+
+        foreach ($options as $opt) {
+            $o = $norm($opt);
+            if ($r === $o || $r === ($aliases[$o] ?? $o)) {
+                return $opt;
+            }
+        }
+        // last resort: substring either way
+        foreach ($options as $opt) {
+            if (str_contains($norm($opt), $r) || str_contains($r, $norm($opt))) {
+                return $opt;
+            }
+        }
+
+        return null;
+    }
+
+    /** Overwrite registered_at (+ the matching status timestamp) from the CSV. */
+    private function backdate(Registration $reg, string $dateStr): void
+    {
+        if ($dateStr === '') {
+            return;
+        }
+        try {
+            $d = Carbon::parse($dateStr);
+        } catch (\Throwable) {
+            return;
+        }
+
+        $reg->registered_at = $d;
+        if ($reg->status === 'confirmed' && $reg->confirmed_at) {
+            $reg->confirmed_at = $d;
+        } elseif ($reg->status === 'waitlisted' && $reg->waitlisted_at) {
+            $reg->waitlisted_at = $d;
+        }
+        $reg->saveQuietly();
+
+        if ($reg->status === 'waitlisted') {
+            WaitlistHistory::where('registration_id', $reg->id)
+                ->where('action', 'joined_queue')
+                ->update(['created_at' => $d]);
+        }
     }
 
     /** @return array<int, array<string,string>>|null  rows keyed by header (or null on a header error) */

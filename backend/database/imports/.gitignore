@@ -1,0 +1,5 @@
+# Real participant data must not be committed. Only the template + docs are tracked.
+*
+!.gitignore
+!README.md
+!angkor-wat-half-marathon-2026.csv

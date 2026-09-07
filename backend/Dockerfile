@@ -23,6 +23,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         pcntl \
         opcache
 
+# PHP runtime overrides (upload limits, memory) — loaded last from conf.d
+COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
+
 # Copy Composer binary from official image
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

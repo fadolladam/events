@@ -4,6 +4,7 @@ import { ROLE_TIERS, hasRole, type EventItem } from '../services/api';
 import { useAuth } from '../services/auth';
 import { paths } from '../routes/paths';
 import { EventWizardModal } from '../modules/admin/EventWizardModal';
+import { BrandMark } from './BrandMark';
 import { LayoutDashboard, Calendar, ShieldCheck, LogOut, ExternalLink } from 'lucide-react';
 
 const NAV_ITEMS: { to: string; label: string; icon: typeof LayoutDashboard; allow: readonly string[] }[] = [
@@ -42,18 +43,8 @@ export const AdminLayout: React.FC = () => {
     <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row text-slate-900">
       <aside className="w-full md:w-64 bg-rhb-navy text-slate-200 border-r border-white/10 flex flex-col justify-between shrink-0">
         <div>
-          <div className="px-5 py-5 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="bg-white rounded-xl px-3 py-2 flex items-center shadow-md shrink-0">
-                <img src="/rhb-logo.png" alt="RHB Bank" className="h-6 w-auto" />
-              </div>
-              <div className="leading-tight">
-                <span className="block text-sm font-bold text-white tracking-tight">Events</span>
-                <span className="block text-[10px] text-sky-300 font-semibold tracking-[0.12em] whitespace-nowrap">
-                  INTERNAL ADMIN
-                </span>
-              </div>
-            </div>
+          <div className="border-b border-white/10">
+            <BrandMark theme="dark" size="lg" block />
           </div>
 
           <nav className="p-4 space-y-1.5 text-xs font-semibold">

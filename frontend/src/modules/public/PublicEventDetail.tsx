@@ -2,6 +2,7 @@ import React from 'react';
 import { EventItem } from '../../services/api';
 import { Calendar, MapPin, Users, Clock, ShieldAlert, ArrowLeft, CheckCircle2, AlertCircle, Share2, FileText, ExternalLink } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
+import { BrandMark } from '../../components/BrandMark';
 
 interface PublicEventDetailProps {
   event: EventItem;
@@ -90,7 +91,7 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
             <span className="text-xs font-mono font-bold bg-white/70 text-rhb-blue px-2.5 py-1 rounded-md">
               {event.event_code}
             </span>
-            <img src="/rhb-logo.png" alt="RHB" className="h-6 w-auto" />
+            <BrandMark theme="light" size="sm" />
           </div>
         </div>
       </div>

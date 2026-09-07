@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiClient, EventCategory, EventItem } from '../../services/api';
 import { Calendar, MapPin, Users, Search, Filter, ArrowRight, ShieldCheck, Ticket, LayoutGrid } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
+import { BrandMark } from '../../components/BrandMark';
 
 interface PublicEventsCatalogProps {
   onSelectEvent: (event: EventItem) => void;
@@ -81,15 +82,7 @@ export const PublicEventsCatalog: React.FC<PublicEventsCatalogProps> = ({
       {/* Top Header */}
       <header className="bg-rhb-light text-rhb-navy sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/rhb-logo.png" alt="RHB" className="h-7 w-auto" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold tracking-tight">Events</span>
-              <span className="hidden sm:inline-block text-xs font-semibold text-rhb-blue bg-white/70 px-2 py-0.5 rounded-full">
-                Internal Portal
-              </span>
-            </div>
-          </div>
+          <BrandMark theme="light" size="md" />
 
           <div className="flex items-center gap-3">
             <button

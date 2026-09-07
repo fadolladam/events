@@ -9,6 +9,7 @@ use App\Modules\Events\EventCategoryController;
 use App\Modules\Events\EventController;
 use App\Modules\Events\EventTemplateController;
 use App\Modules\Forms\FormBuilderController;
+use App\Modules\Forms\FormTemplateController;
 use App\Modules\Media\MediaController;
 use App\Modules\Notifications\NotificationController;
 use App\Modules\Registration\RegistrationController;
@@ -79,6 +80,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/categories', [EventCategoryController::class, 'index']);
         Route::get('/templates', [EventTemplateController::class, 'index']);
         Route::get('/events/{eventId}/form', [FormBuilderController::class, 'show']);
+
+        // Reusable registration-form templates (read)
+        Route::get('/forms/templates', [FormTemplateController::class, 'index']);
+        Route::get('/forms/templates/{id}', [FormTemplateController::class, 'show']);
     });
 
     /*
@@ -96,6 +101,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/media/upload', [MediaController::class, 'uploadImage'])->middleware('throttle:30,1');
 
         Route::put('/events/{eventId}/form', [FormBuilderController::class, 'update']);
+
+        // Reusable registration-form templates (write)
+        Route::post('/forms/templates', [FormTemplateController::class, 'store']);
+        Route::put('/forms/templates/{id}', [FormTemplateController::class, 'update']);
+        Route::delete('/forms/templates/{id}', [FormTemplateController::class, 'destroy']);
 
         Route::get('/events/{eventId}/export/csv', [ReportController::class, 'exportCsv']);
         Route::get('/events/{eventId}/export/pdf', [ReportController::class, 'exportPdf']);

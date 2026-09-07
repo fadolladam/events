@@ -27,6 +27,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Reusable registration-form templates (idempotent, safe on every boot)
+        $this->call(FormTemplateSeeder::class);
+
         // 1. Organization
         $org = Organization::create([
             'name' => 'RHB Bank Berhad',

@@ -128,6 +128,21 @@ export interface RegistrationForm {
   fields: FormField[];
 }
 
+/** Reusable registration-form template (GET /forms/templates). */
+export interface FormTemplateSummary {
+  id: number;
+  name: string;
+  description?: string | null;
+  field_count: number;
+  is_system: boolean;
+  created_by_name?: string | null;
+  updated_at?: string | null;
+}
+
+export interface FormTemplate extends FormTemplateSummary {
+  fields: FormField[];
+}
+
 export interface EventItem {
   id: string;
   title: string;

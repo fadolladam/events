@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { apiClient, FormField, RegistrationForm } from '../../services/api';
-import { X, Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2 } from 'lucide-react';
+import { apiClient, type FormField, type FormTemplateSummary } from '../../services/api';
+import { X, Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Layers, BookmarkPlus } from 'lucide-react';
+import { FormTemplatesModal } from './FormTemplatesModal';
 
 interface FormBuilderModalProps {
   eventId: string;
@@ -19,13 +20,31 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
+  // Reusable form templates
+  const [templates, setTemplates] = useState<FormTemplateSummary[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [managerOpen, setManagerOpen] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       fetchForm();
+      fetchTemplates();
+      setSelectedTemplateId('');
     }
     // Re-run whenever the modal opens OR the event changes so we never keep a
     // previously opened event's form on screen.
   }, [isOpen, eventId]);
+
+  const fetchTemplates = async () => {
+    try {
+      const res = await apiClient.get('/forms/templates');
+      setTemplates(res.data || []);
+    } catch {
+      setTemplates([]);
+    }
+  };
 
   const fetchForm = async () => {
     setLoading(true);
@@ -103,6 +122,45 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
     }
   };
 
+  /** Replace the builder's questions with a saved template (unsaved — user reviews then Saves). */
+  const loadTemplate = async () => {
+    if (!selectedTemplateId || loadError) return;
+    const tpl = templates.find((t) => String(t.id) === selectedTemplateId);
+    if (fields.length > 0 && !confirm(`Replace the current questions with "${tpl?.name}"?`)) return;
+    setApplyingTemplate(true);
+    try {
+      const res = await apiClient.get(`/forms/templates/${selectedTemplateId}`);
+      const loaded: FormField[] = (res.data.fields || []).map((f: FormField, i: number) => ({
+        ...f,
+        is_hidden: false,
+        field_order: i + 1,
+      }));
+      setFields(loaded);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Could not load that reusable form.');
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
+
+  /** Save the builder's current questions as a new reusable template. */
+  const saveAsTemplate = async () => {
+    if (loadError || fields.length === 0) return;
+    const name = window.prompt('Name this reusable form (e.g. "Standard RSVP", "CSR Run"):');
+    if (!name || !name.trim()) return;
+    setSavingTemplate(true);
+    try {
+      await apiClient.post('/forms/templates', { name: name.trim(), fields });
+      await fetchTemplates();
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Could not save the reusable form.');
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
@@ -119,6 +177,59 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
 
         {/* Form Fields List */}
         <div className="p-8 flex-1 overflow-y-auto custom-scrollbar space-y-4">
+          {!loading && !loadError && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-600" /> Reusable Forms
+                </span>
+                <button
+                  onClick={() => setManagerOpen(true)}
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+                >
+                  Manage
+                </button>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Load a saved form…</option>
+                  {templates.some((t) => t.is_system) && (
+                    <optgroup label="Built-in">
+                      {templates.filter((t) => t.is_system).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} · {t.field_count} fields
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {templates.some((t) => !t.is_system) && (
+                    <optgroup label="Saved by your team">
+                      {templates.filter((t) => !t.is_system).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} · {t.field_count} fields
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <button
+                  onClick={loadTemplate}
+                  disabled={!selectedTemplateId || applyingTemplate}
+                  className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold disabled:opacity-40 shrink-0"
+                >
+                  {applyingTemplate ? 'Loading…' : 'Load into builder'}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Loading a form replaces the questions below. Review, then <strong>Save Form Changes</strong> to apply it to this event.
+              </p>
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-12 text-slate-400 text-xs">Loading form builder...</div>
           ) : loadError ? (
@@ -268,7 +379,16 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={saveAsTemplate}
+              disabled={savingTemplate || loading || !!loadError || fields.length === 0}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-1.5 disabled:opacity-40"
+              title="Save these questions as a reusable form"
+            >
+              <BookmarkPlus className="w-4 h-4" />
+              <span>{savingTemplate ? 'Saving…' : 'Save as reusable form'}</span>
+            </button>
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100"
@@ -286,6 +406,12 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
           </div>
         </div>
       </div>
+
+      <FormTemplatesModal
+        isOpen={managerOpen}
+        onClose={() => setManagerOpen(false)}
+        onChanged={fetchTemplates}
+      />
     </div>
   );
 };

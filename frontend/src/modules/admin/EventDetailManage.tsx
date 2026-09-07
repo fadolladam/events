@@ -23,7 +23,21 @@ import {
   RefreshCw,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
 } from 'lucide-react';
+
+/** "06 Sep 2026, 02:22:31 PM" — full date + time to the second, so two
+ *  registrations in the same minute can still be told apart. */
+const fmtRegisteredAt = (iso?: string): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const date = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return `${date}, ${time}`;
+};
+
+const PER_PAGE_OPTIONS = [25, 50, 100, 200];
 
 export const EventDetailManage: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +47,15 @@ export const EventDetailManage: React.FC = () => {
 
   const [event, setEvent] = useState<EventItem | null>(null);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [regPage, setRegPage] = useState(1);
+  const [regPerPage, setRegPerPage] = useState(25);
+  const [regMeta, setRegMeta] = useState<{ total: number; last_page: number; from: number | null; to: number | null }>({
+    total: 0,
+    last_page: 1,
+    from: null,
+    to: null,
+  });
+  const [regLoading, setRegLoading] = useState(false);
   const [expandedRegId, setExpandedRegId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -68,6 +91,8 @@ export const EventDetailManage: React.FC = () => {
     setLoading(true);
     setEvent(null);
     setNotFound(false);
+    setRegPage(1);
+    setRegistrations([]);
     apiClient
       .get(`/events/${slug}`)
       .then((res) => {
@@ -90,10 +115,10 @@ export const EventDetailManage: React.FC = () => {
 
   useEffect(() => {
     if (routeTab === 'registrations' && eventUuid) {
-      fetchRegistrations(eventUuid);
+      fetchRegistrations(eventUuid, regPage, regPerPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeTab, eventUuid]);
+  }, [routeTab, eventUuid, regPage, regPerPage]);
 
   const fetchEvent = async () => {
     try {
@@ -104,12 +129,23 @@ export const EventDetailManage: React.FC = () => {
     }
   };
 
-  const fetchRegistrations = async (id: string) => {
+  const fetchRegistrations = async (id: string, page = 1, perPage = 25) => {
+    setRegLoading(true);
     try {
-      const res = await apiClient.get(`/events/${id}/registrations`);
+      const res = await apiClient.get(`/events/${id}/registrations`, {
+        params: { page, per_page: perPage },
+      });
       setRegistrations(res.data.data || []);
+      setRegMeta({
+        total: res.data.total ?? (res.data.data || []).length,
+        last_page: res.data.last_page ?? 1,
+        from: res.data.from ?? null,
+        to: res.data.to ?? null,
+      });
     } catch (err) {
       console.error('Failed to load registrations', err);
+    } finally {
+      setRegLoading(false);
     }
   };
 
@@ -288,11 +324,36 @@ export const EventDetailManage: React.FC = () => {
       {/* REGISTRATIONS TAB */}
       {currentTab === 'registrations' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Registered Participants ({registrations.length})</h3>
-            <button onClick={() => fetchRegistrations(eventUuid)} className="p-1.5 text-slate-400 hover:text-slate-600">
-              <RefreshCw className="w-4 h-4" />
-            </button>
+          <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h3 className="text-sm font-bold text-slate-900">
+              Registered Participants{' '}
+              <span className="font-normal text-slate-400">
+                ({regMeta.total}
+                {regMeta.total > 0 && regMeta.from ? ` · showing ${regMeta.from}–${regMeta.to}` : ''})
+              </span>
+            </h3>
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-slate-400">Per page</label>
+              <select
+                value={regPerPage}
+                onChange={(e) => {
+                  setRegPage(1);
+                  setRegPerPage(Number(e.target.value));
+                }}
+                className="px-2 py-1 rounded-lg border border-slate-200 text-xs bg-white"
+              >
+                {PER_PAGE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => fetchRegistrations(eventUuid, regPage, regPerPage)}
+                className="p-1.5 text-slate-400 hover:text-slate-600"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-4 h-4 ${regLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -305,13 +366,19 @@ export const EventDetailManage: React.FC = () => {
                   <th className="py-3 px-4">Email</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Attendance</th>
-                  <th className="py-3 px-4">Registered On</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Registered On <span className="normal-case font-normal text-slate-300">(local time)</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {registrations.length === 0 ? (
+                {regMeta.total === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400">No registrations recorded yet.</td>
+                  </tr>
+                ) : registrations.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      {regLoading ? 'Loading…' : 'No registrations on this page.'}
+                    </td>
                   </tr>
                 ) : (
                   registrations.map((r) => {
@@ -357,7 +424,7 @@ export const EventDetailManage: React.FC = () => {
                           <td className="py-3.5 px-4 uppercase text-[10px] font-semibold text-slate-600">
                             {r.attendance_status.replace('_', ' ')}
                           </td>
-                          <td className="py-3.5 px-4 text-slate-400">{new Date(r.registered_at).toLocaleDateString()}</td>
+                          <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap tabular-nums">{fmtRegisteredAt(r.registered_at)}</td>
                         </tr>
 
                         {isOpen && (
@@ -403,6 +470,30 @@ export const EventDetailManage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {regMeta.last_page > 1 && (
+            <div className="p-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-400">
+                Page {regPage} of {regMeta.last_page}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setRegPage((p) => Math.max(1, p - 1))}
+                  disabled={regPage <= 1 || regLoading}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                </button>
+                <button
+                  onClick={() => setRegPage((p) => Math.min(regMeta.last_page, p + 1))}
+                  disabled={regPage >= regMeta.last_page || regLoading}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 flex items-center gap-1"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

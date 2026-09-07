@@ -142,8 +142,13 @@ class RegistrationController extends Controller
             });
         }
 
-        $perPage = (int) $request->input('per_page', 25);
-        $registrations = $query->orderBy('registered_at', 'desc')->paginate($perPage);
+        $perPage = min(500, max(1, (int) $request->input('per_page', 25)));
+        // registration_sequence is atomic + monotonic, so it gives a stable
+        // order even when many people register in the same second.
+        $registrations = $query
+            ->orderBy('registered_at', 'desc')
+            ->orderBy('registration_sequence', 'desc')
+            ->paginate($perPage);
 
         $registrations->getCollection()->transform(function ($reg) {
             $reg->queue_position = $reg->getQueuePosition();

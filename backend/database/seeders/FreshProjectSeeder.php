@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\RegistrationForm;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -127,47 +128,54 @@ class FreshProjectSeeder extends Seeder
         ]);
 
         // ==============================================================
-        //  Event 2 — Marathon 2026
+        //  Event 2 — The 31st Angkor Wat International Half Marathon
+        //  Real event: first Sunday of December in Siem Reap, Cambodia.
+        //  2026 edition = 31st; race day = Sun 6 Dec 2026, 06:00 local.
         // ==============================================================
+        $tz = 'Asia/Phnom_Penh';
         $marathon = Event::create([
             'organization_id' => $org->id,
-            'title' => 'Marathon 2026',
-            'short_title' => 'Marathon 2026',
-            'slug' => 'marathon-2026',
-            'event_code' => 'MARA26',
-            'description' => 'RHB charity run supporting community programmes. Choose the 5KM Fun Run, 10KM, or 21KM Half Marathon. All proceeds go to CSR initiatives.',
-            'short_description' => 'RHB charity run — 5KM / 10KM / 21KM.',
+            'title' => 'The 31st Angkor Wat International Half Marathon',
+            'short_title' => "Angkor Wat Int'l Half Marathon",
+            'slug' => 'angkor-wat-half-marathon-2026',
+            'event_code' => 'AWHM26',
+            'description' => 'The Angkor Wat International Half Marathon is held on the first Sunday of December in Siem Reap, Cambodia, starting and finishing on the causeway in front of Angkor Wat inside the Angkor Archaeological Park (a UNESCO World Heritage Site). First run in 1996 and organised in aid of landmine survivors and persons with disabilities, the 2026 edition is the 31st. Distances: 3KM fun run, 5KM, 10KM and the 21.1KM half marathon, with wheelchair races.',
+            'short_description' => 'First Sunday of December in Siem Reap – 3KM / 5KM / 10KM / 21KM half marathon.',
             'category_id' => $categories['csr']->id,
             'event_type' => 'physical',
             'visibility' => 'public',
             'status' => 'registration_open',
             'cover_image_url' => 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=1200&q=70',
-            'organizer_name' => 'CSR & Community Team',
+            'organizer_name' => 'RHB Cambodia – CSR & Community',
             'owner_user_id' => $users['event_organizer']->id,
-            'contact_name' => 'Aidan Lim',
-            'contact_email' => 'marathon@rhbgroup.com',
+            'contact_name' => 'RHB Cambodia Marcom',
+            'contact_email' => 'kh.marcom@rhbgroup.com',
             'contact_phone' => '+60 3-9280 5678',
-            'start_at' => now()->addDays(60)->setTime(6, 0),
-            'end_at' => now()->addDays(60)->setTime(11, 0),
-            'timezone' => 'Asia/Kuala_Lumpur',
+            // datetimes stored as UTC (the app's timezone); the frontend renders
+            // them back in `timezone` for display.
+            'start_at' => Carbon::create(2026, 12, 6, 6, 0, 0, $tz)->utc(),
+            'end_at' => Carbon::create(2026, 12, 6, 11, 0, 0, $tz)->utc(),
+            'timezone' => $tz,
             'registration_open_at' => now(),
-            'registration_close_at' => now()->addDays(55),
-            'capacity' => 500,
+            'registration_close_at' => Carbon::create(2026, 11, 29, 23, 59, 0, $tz)->utc(),
+            'capacity' => 79,
             'waitlist_enabled' => true,
             'waitlist_capacity' => 150,
             'approval_mode' => 'automatic',
             'allow_cancellation' => true,
-            'cancellation_deadline' => now()->addDays(50),
+            'cancellation_deadline' => Carbon::create(2026, 11, 22, 23, 59, 0, $tz)->utc(),
             'duplicate_rule' => 'email',
-            'venue_name' => 'Padang Merbok',
-            'address' => 'Jalan Parlimen',
-            'city' => 'Kuala Lumpur',
-            'province' => 'Wilayah Persekutuan',
-            'country' => 'Malaysia',
-            'postal_code' => '50480',
+            'venue_name' => 'Angkor Wat – Angkor Archaeological Park',
+            'address' => 'Angkor Wat causeway, Angkor Archaeological Park',
+            'city' => 'Siem Reap',
+            'province' => 'Siem Reap Province',
+            'country' => 'Cambodia',
+            'postal_code' => '17000',
+            'latitude' => 13.4124693,
+            'longitude' => 103.8669857,
             'primary_color' => '#0067b1',
             'secondary_color' => '#5bc2e7',
-            'terms_and_conditions' => 'Participants run at their own risk and must accept the event waiver and release of liability.',
+            'terms_and_conditions' => 'Participants take part at their own risk and must accept the official event waiver and release of liability. The event is run in aid of landmine survivors and persons with disabilities in Cambodia.',
             'created_by' => $users['super_admin']->id,
             'published_at' => now(),
         ]);
@@ -177,12 +185,12 @@ class FreshProjectSeeder extends Seeder
             ['full_name', 'Full Name', 'text', true],
             ['email', 'Email Address', 'email', true],
             ['phone', 'Phone Number', 'phone', true],
-            ['category', 'Race Category', 'select', true, ['5KM Fun Run', '10KM', '21KM Half Marathon']],
-            ['tshirt_size', 'T-Shirt Size', 'select', true, ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']],
             ['emergency_contact_name', 'Emergency Contact Name', 'text', true],
             ['emergency_contact_phone', 'Emergency Contact Phone', 'phone', true],
+            ['race_distance', 'Race Distance', 'select', true, ['3KM Fun Run', '5KM', '10KM', '21KM Half Marathon']],
+            ['tshirt_size', 'T-Shirt Size', 'select', true, ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']],
             ['medical_conditions', 'Medical conditions we should know about', 'textarea', false],
-            ['waiver', 'I have read and accept the event waiver and release of liability.', 'checkbox', true, ['I accept']],
+            ['waiver', 'I have read and accept the official event waiver and release of liability.', 'checkbox', true, ['I accept']],
         ]);
     }
 

@@ -15,6 +15,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
 }) => {
   const [fields, setFields] = useState<FormField[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -22,15 +23,22 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
     if (isOpen) {
       fetchForm();
     }
+    // Re-run whenever the modal opens OR the event changes so we never keep a
+    // previously opened event's form on screen.
   }, [isOpen, eventId]);
 
   const fetchForm = async () => {
     setLoading(true);
+    setLoadError(null);
+    // Clear immediately: a slow or failing request must not leave the fields
+    // of the last event we looked at visible for this one.
+    setFields([]);
     try {
       const res = await apiClient.get(`/events/${eventId}/form`);
       setFields(res.data.fields || []);
     } catch (err) {
       console.error('Failed to load form fields', err);
+      setLoadError('Could not load this event’s registration form. Close and reopen to try again.');
     } finally {
       setLoading(false);
     }
@@ -80,6 +88,9 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
   };
 
   const handleSave = async () => {
+    // Never PUT when the form failed to load — that would push whatever fields
+    // are on screen onto an event whose real form we never saw.
+    if (loadError) return;
     setSaving(true);
     try {
       await apiClient.put(`/events/${eventId}/form`, { fields });
@@ -110,6 +121,8 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
         <div className="p-8 flex-1 overflow-y-auto custom-scrollbar space-y-4">
           {loading ? (
             <div className="text-center py-12 text-slate-400 text-xs">Loading form builder...</div>
+          ) : loadError ? (
+            <div className="text-center py-12 text-red-500 text-xs">{loadError}</div>
           ) : (
             fields.map((f, i) => {
               const isLocked = ['full_name', 'email'].includes(f.field_key);
@@ -234,13 +247,15 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
             })
           )}
 
-          <button
-            onClick={addField}
-            className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 text-slate-600 hover:text-indigo-600 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Custom Question / Field</span>
-          </button>
+          {!loading && !loadError && (
+            <button
+              onClick={addField}
+              className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 text-slate-600 hover:text-indigo-600 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Custom Question / Field</span>
+            </button>
+          )}
         </div>
 
         {/* Footer */}
@@ -262,7 +277,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || loading || !!loadError}
               className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />

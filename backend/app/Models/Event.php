@@ -135,7 +135,13 @@ class Event extends Model
         return $this->hasMany(Attendance::class, 'event_id');
     }
 
-    public function calculateDynamicStatus(): string
+    /**
+     * Resolve the event's real-time status from its dates and registration
+     * volume. Pass pre-computed counts (e.g. from a grouped dashboard query)
+     * to avoid the two per-event COUNT queries; omit them and they are
+     * fetched on demand as before.
+     */
+    public function calculateDynamicStatus(?int $confirmedCount = null, ?int $waitlistCount = null): string
     {
         $now = now();
 
@@ -163,8 +169,8 @@ class Event extends Model
             return 'registration_closed';
         }
 
-        $confirmedCount = $this->confirmedRegistrations()->count();
-        $waitlistCount = $this->waitlistedRegistrations()->count();
+        $confirmedCount ??= $this->confirmedRegistrations()->count();
+        $waitlistCount ??= $this->waitlistedRegistrations()->count();
 
         if ($confirmedCount >= $this->capacity) {
             if (!$this->waitlist_enabled) {

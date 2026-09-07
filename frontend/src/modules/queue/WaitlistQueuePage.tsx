@@ -5,9 +5,11 @@ import { Clock, Users, ArrowUpCircle, ShieldCheck, History, ArrowLeft, RefreshCw
 interface WaitlistQueuePageProps {
   eventId: string;
   onBack: () => void;
+  /** rendered inside the Event console shell — hide own page chrome */
+  embedded?: boolean;
 }
 
-export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, onBack }) => {
+export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, onBack, embedded = false }) => {
   const [event, setEvent] = useState<EventItem | null>(null);
   const [waitlist, setWaitlist] = useState<Registration[]>([]);
   const [history, setHistory] = useState<any[]>([]);
@@ -62,45 +64,57 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
     }
   };
 
+  const actions = (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={fetchData}
+        className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
+        title="Refresh Queue"
+      >
+        <RefreshCw className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={handlePromoteEligible}
+        disabled={promoting || waitlist.length === 0}
+        className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md shadow-amber-600/20 flex items-center gap-2 transition-all disabled:opacity-50"
+      >
+        <ArrowUpCircle className="w-4 h-4" />
+        <span>{promoting ? 'Promoting...' : 'Promote Next in Queue'}</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="p-6 sm:p-8 space-y-6 max-w-6xl mx-auto">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-2 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Event Details</span>
-          </button>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Waitlist & Queue Management
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            FIFO automated waiting list for <strong>{event?.title}</strong> ({event?.event_code}).
-          </p>
+    <div className={embedded ? 'space-y-6' : 'p-6 sm:p-8 space-y-6 max-w-6xl mx-auto'}>
+      {embedded ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Waitlist &amp; Queue Management</h2>
+            <p className="text-xs text-slate-500">FIFO automated waiting list. Auto-promotes on cancellations.</p>
+          </div>
+          {actions}
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchData}
-            className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
-            title="Refresh Queue"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={handlePromoteEligible}
-            disabled={promoting || waitlist.length === 0}
-            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md shadow-amber-600/20 flex items-center gap-2 transition-all disabled:opacity-50"
-          >
-            <ArrowUpCircle className="w-4 h-4" />
-            <span>{promoting ? 'Promoting...' : 'Promote Next in Queue'}</span>
-          </button>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-2 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Event Details</span>
+            </button>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              Waitlist &amp; Queue Management
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              FIFO automated waiting list for <strong>{event?.title}</strong> ({event?.event_code}).
+            </p>
+          </div>
+          {actions}
         </div>
-      </div>
+      )}
 
       {message && (
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">

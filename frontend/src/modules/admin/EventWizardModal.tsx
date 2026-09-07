@@ -9,6 +9,14 @@ interface EventWizardModalProps {
   onEventCreated: (event: EventItem) => void;
 }
 
+/** Format a Date as a local `YYYY-MM-DDTHH:mm` string for <input type="datetime-local">. */
+const toLocalInput = (d: Date): string => {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+const nowLocalInput = (): string => toLocalInput(new Date());
+
 export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   isOpen,
   onClose,
@@ -31,10 +39,14 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   const [visibility, setVisibility] = useState('public');
   const [status, setStatus] = useState('registration_open');
 
-  // Dates
-  const [startDate, setStartDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16));
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 86400000 + 7200000).toISOString().slice(0, 16));
-  const [timezone, setTimezone] = useState('UTC');
+  // Dates — `datetime-local` values are LOCAL wall-clock, so format in local time.
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [regOpenAt, setRegOpenAt] = useState('');
+  const [regCloseAt, setRegCloseAt] = useState('');
+  const [timezone, setTimezone] = useState(
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  );
 
   // Capacity & Queue
   const [capacity, setCapacity] = useState(100);
@@ -58,13 +70,96 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
     }
   }, [isOpen]);
 
+  // Reset the whole wizard every time it opens. The modal is mounted once and
+  // reused, so without this the date defaults stay frozen at first-render time
+  // and a later "create" can land start/end in the past (event then reads as
+  // completed / registration-closed everywhere).
+  useEffect(() => {
+    if (!isOpen) return;
+    const start = new Date(Date.now() + 7 * 86400000);
+    start.setHours(9, 0, 0, 0);
+    const end = new Date(start.getTime() + 2 * 3600000);
+    setStartDate(toLocalInput(start));
+    setEndDate(toLocalInput(end));
+    setRegOpenAt('');
+    setRegCloseAt('');
+    setCurrentStep(1);
+    setError(null);
+    setLoading(false);
+    setTitle('');
+    setShortTitle('');
+    setEventCode('');
+    setDescription('');
+    setCoverImageUrl('');
+    setAttachments([]);
+    setCategoryId('');
+    setEventType('physical');
+    setVisibility('public');
+    setStatus('registration_open');
+    setCapacity(100);
+    setWaitlistEnabled(true);
+    setWaitlistCapacity('');
+    setApprovalMode('automatic');
+    setDuplicateRule('email');
+    setAllowCancellation(true);
+    setVenueName('');
+    setAddress('');
+    setCity('');
+    setMeetingUrl('');
+    setOrganizerName('');
+    setContactEmail('');
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
+  // Keep the event duration when the start moves, and never let end <= start.
+  const handleStartChange = (value: string) => {
+    setStartDate(value);
+    const oldStart = new Date(startDate).getTime();
+    const newStart = new Date(value).getTime();
+    if (Number.isNaN(newStart)) return;
+    const oldEnd = new Date(endDate).getTime();
+    const duration = !Number.isNaN(oldStart) && !Number.isNaN(oldEnd) && oldEnd > oldStart
+      ? oldEnd - oldStart
+      : 2 * 3600000;
+    setEndDate(toLocalInput(new Date(newStart + duration)));
+  };
+
   const handleSubmit = async () => {
+    // Client-side date sanity — the API rejects these too, but catching them
+    // here gives a clear message on the right step instead of a generic error.
+    const startMs = new Date(startDate).getTime();
+    const endMs = new Date(endDate).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+      setCurrentStep(2);
+      setError('Please set a valid start and end date/time.');
+      return;
+    }
+    if (startMs < Date.now() - 60_000) {
+      setCurrentStep(2);
+      setError('The start date/time is in the past. Pick a future start.');
+      return;
+    }
+    if (endMs <= startMs) {
+      setCurrentStep(2);
+      setError('The end date/time must be after the start.');
+      return;
+    }
+    if (regCloseAt && new Date(regCloseAt).getTime() > startMs) {
+      setCurrentStep(2);
+      setError('Registration must close on or before the event starts.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
+      // "Upcoming" means registration opens later — default that to the event
+      // start unless an explicit opening time was given, otherwise the backend
+      // treats it as already open.
+      const resolvedRegOpen = regOpenAt || (status === 'upcoming' ? startDate : undefined);
+
       const payload = {
         title,
         short_title: shortTitle || undefined,
@@ -78,6 +173,8 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
         status,
         start_at: startDate,
         end_at: endDate,
+        registration_open_at: resolvedRegOpen,
+        registration_close_at: regCloseAt || undefined,
         timezone,
         capacity: Number(capacity),
         waitlist_enabled: waitlistEnabled,
@@ -97,7 +194,13 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
       onEventCreated(res.data);
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create event. Please check required fields.');
+      const data = err.response?.data;
+      const firstFieldError =
+        data?.errors && typeof data.errors === 'object'
+          ? (Object.values(data.errors)[0] as string[] | undefined)?.[0]
+          : undefined;
+      setError(firstFieldError || data?.message || 'Failed to create event. Please check required fields.');
+      if (firstFieldError) setCurrentStep(2);
     } finally {
       setLoading(false);
     }
@@ -288,8 +391,9 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
                   <input
                     type="datetime-local"
                     required
+                    min={nowLocalInput()}
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => handleStartChange(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -301,10 +405,43 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
                   <input
                     type="datetime-local"
                     required
+                    min={startDate || nowLocalInput()}
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Registration Opens <span className="text-slate-400 normal-case font-medium">(optional)</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    min={nowLocalInput()}
+                    max={startDate || undefined}
+                    value={regOpenAt}
+                    onChange={(e) => setRegOpenAt(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Leave blank to open immediately. For an “Upcoming” event this defaults to the start time.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Registration Closes <span className="text-slate-400 normal-case font-medium">(optional)</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    min={regOpenAt || nowLocalInput()}
+                    max={startDate || undefined}
+                    value={regCloseAt}
+                    onChange={(e) => setRegCloseAt(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Leave blank to keep registration open until the event starts.</p>
                 </div>
               </div>
 

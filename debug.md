@@ -1,6 +1,6 @@
 TASK: DEBUG AND FIX ADMIN REGISTRATION FORM NOT REFLECTING ON PUBLIC EVENT FRONTEND
 
-We have a functional EventNex event management system, but there is a problem with the event registration form.
+We have a functional Events event management system, but there is a problem with the event registration form.
 
 PROBLEM:
 

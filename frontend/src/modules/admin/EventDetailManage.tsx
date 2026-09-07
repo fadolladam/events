@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiClient, EventItem, Registration, getStoredUser, ROLE_TIERS, hasRole } from '../../services/api';
+import { paths } from '../../routes/paths';
 import { QrScannerConsole } from '../checkin/QrScannerConsole';
 import { WaitlistQueuePage } from '../queue/WaitlistQueuePage';
 import { AttendanceRoster } from '../attendance/AttendanceRoster';
 import { EventReportsPage } from '../reports/EventReportsPage';
 import { FormBuilderModal } from '../forms/FormBuilderModal';
+import { EventOverviewTab } from './EventOverviewTab';
 import { EventSettingsModal } from './EventSettingsModal';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import {
   LayoutDashboard,
   Users,
@@ -16,61 +20,93 @@ import {
   BarChart3,
   Settings,
   ArrowLeft,
-  Calendar,
-  MapPin,
-  CheckCircle2,
-  AlertTriangle,
   RefreshCw,
   ChevronRight,
   ChevronDown,
 } from 'lucide-react';
 
-interface EventDetailManageProps {
-  eventId: string;
-  initialTab?: string;
-  onBack: () => void;
-}
+export const EventDetailManage: React.FC = () => {
+  const navigate = useNavigate();
+  const { slug = '', tab: routeTab = 'overview' } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const panel = searchParams.get('panel'); // 'form' | 'settings' | null
 
-export const EventDetailManage: React.FC<EventDetailManageProps> = ({
-  eventId,
-  initialTab = 'overview',
-  onBack,
-}) => {
   const [event, setEvent] = useState<EventItem | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
-  const [formModalOpen, setFormModalOpen] = useState(false);
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [expandedRegId, setExpandedRegId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   const role = getStoredUser()?.role;
   const canManage = hasRole(role, ROLE_TIERS.eventManager);
   const canRegistrations = hasRole(role, ROLE_TIERS.registration);
   const canCheckin = hasRole(role, ROLE_TIERS.checkin);
 
-  useEffect(() => {
-    fetchEvent();
-    if (activeTab === 'registrations') {
-      fetchRegistrations();
+  // The real UUID for every downstream call (the URL may carry the slug).
+  const eventUuid = event?.id ?? '';
+
+  // Navigate between tabs = navigate between URLs. form/settings are ?panel= modals.
+  const goToTab = (key: string) => {
+    if (key === 'form' || key === 'settings') {
+      const next = new URLSearchParams(searchParams);
+      next.set('panel', key);
+      setSearchParams(next);
+    } else {
+      navigate(paths.eventConsole(slug, key));
     }
-  }, [eventId, activeTab]);
+  };
+  const closePanel = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('panel');
+    setSearchParams(next, { replace: true });
+  };
+
+  // Load the event when the :slug segment changes (NOT on tab change — that
+  // would remount every embedded tab, e.g. churn the QR scanner).
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setEvent(null);
+    setNotFound(false);
+    apiClient
+      .get(`/events/${slug}`)
+      .then((res) => {
+        if (cancelled) return;
+        setEvent(res.data);
+        // Pretty up the URL: if we were linked by UUID, swap to the slug form.
+        if (res.data?.slug && res.data.slug !== slug) {
+          navigate(paths.eventConsole(res.data.slug, routeTab) + (panel ? `?panel=${panel}` : ''), {
+            replace: true,
+          });
+        }
+      })
+      .catch(() => !cancelled && setNotFound(true))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
+
+  useEffect(() => {
+    if (routeTab === 'registrations' && eventUuid) {
+      fetchRegistrations(eventUuid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeTab, eventUuid]);
 
   const fetchEvent = async () => {
-    setLoading(true);
     try {
-      const res = await apiClient.get(`/events/${eventId}`);
+      const res = await apiClient.get(`/events/${eventUuid || slug}`);
       setEvent(res.data);
     } catch (err) {
       console.error('Failed to load event', err);
-    } finally {
-      setLoading(false);
     }
   };
 
-  const fetchRegistrations = async () => {
+  const fetchRegistrations = async (id: string) => {
     try {
-      const res = await apiClient.get(`/events/${eventId}/registrations`);
+      const res = await apiClient.get(`/events/${id}/registrations`);
       setRegistrations(res.data.data || []);
     } catch (err) {
       console.error('Failed to load registrations', err);
@@ -79,33 +115,43 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      await apiClient.patch(`/events/${eventId}/status`, { status: newStatus });
+      await apiClient.patch(`/events/${eventUuid}/status`, { status: newStatus });
       fetchEvent();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update status.');
     }
   };
 
+  if (notFound) {
+    return (
+      <div className="p-8 text-center space-y-3">
+        <p className="text-sm text-slate-600">That event could not be found.</p>
+        <button
+          onClick={() => navigate(paths.events())}
+          className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold"
+        >
+          Back to All Events
+        </button>
+      </div>
+    );
+  }
+
   if (loading || !event) {
     return <div className="p-8 text-center text-xs text-slate-400">Loading event management dashboard...</div>;
   }
 
-  // Render dedicated sub-screens if active (role-gated — mirrors routes/api.php)
-  if (activeTab === 'checkin' && canCheckin) {
-    return <QrScannerConsole eventId={eventId} onBack={() => setActiveTab('overview')} />;
-  }
-
-  if (activeTab === 'queue' && canRegistrations) {
-    return <WaitlistQueuePage eventId={eventId} onBack={() => setActiveTab('overview')} />;
-  }
-
-  if (activeTab === 'attendance' && canCheckin) {
-    return <AttendanceRoster eventId={eventId} onBack={() => setActiveTab('overview')} />;
-  }
-
-  if (activeTab === 'reports') {
-    return <EventReportsPage eventId={eventId} onBack={() => setActiveTab('overview')} />;
-  }
+  // Body tabs the current role may open. `form` / `settings` are modals, not
+  // body tabs. Anything else (stale value, deep link the role can't use) falls
+  // back to Overview so the console never renders a blank body.
+  const tabAccess: Record<string, boolean> = {
+    overview: true,
+    registrations: canRegistrations,
+    queue: canRegistrations,
+    checkin: canCheckin,
+    attendance: canCheckin,
+    reports: true,
+  };
+  const currentTab = tabAccess[routeTab] ? routeTab : 'overview';
 
   return (
     <div className="p-6 sm:p-8 space-y-6 max-w-7xl mx-auto">
@@ -113,7 +159,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <button
-            onClick={onBack}
+            onClick={() => navigate(paths.events())}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-2 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -157,19 +203,19 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
       {/* Tab Navigation — filtered by the signed-in user's role */}
       <div className="flex border-b border-slate-200 gap-6 text-xs font-bold overflow-x-auto pb-px custom-scrollbar">
         {[
-          { key: 'overview', label: 'Overview', icon: LayoutDashboard, show: true, onClick: () => setActiveTab('overview') },
-          { key: 'registrations', label: 'Registrations', icon: Users, show: canRegistrations, onClick: () => setActiveTab('registrations') },
-          { key: 'form', label: 'Form Builder', icon: FileEdit, show: canManage, onClick: () => setFormModalOpen(true) },
-          { key: 'queue', label: `Queue & Waitlist (${event.waitlist_count || 0})`, icon: Clock, show: canRegistrations, onClick: () => setActiveTab('queue') },
-          { key: 'checkin', label: 'QR Check-In Console', icon: QrCode, show: canCheckin, onClick: () => setActiveTab('checkin') },
-          { key: 'attendance', label: 'Attendance Roster', icon: CheckSquare, show: canCheckin, onClick: () => setActiveTab('attendance') },
-          { key: 'reports', label: 'Analytics & Reports', icon: BarChart3, show: true, onClick: () => setActiveTab('reports') },
-          { key: 'settings', label: 'Settings', icon: Settings, show: canManage, onClick: () => setSettingsModalOpen(true) },
+          { key: 'overview', label: 'Overview', icon: LayoutDashboard, show: true, onClick: () => goToTab('overview') },
+          { key: 'registrations', label: 'Registrations', icon: Users, show: canRegistrations, onClick: () => goToTab('registrations') },
+          { key: 'form', label: 'Form Builder', icon: FileEdit, show: canManage, onClick: () => goToTab('form') },
+          { key: 'queue', label: `Queue & Waitlist (${event.waitlist_count || 0})`, icon: Clock, show: canRegistrations, onClick: () => goToTab('queue') },
+          { key: 'checkin', label: 'QR Check-In Console', icon: QrCode, show: canCheckin, onClick: () => goToTab('checkin') },
+          { key: 'attendance', label: 'Attendance Roster', icon: CheckSquare, show: canCheckin, onClick: () => goToTab('attendance') },
+          { key: 'reports', label: 'Analytics & Reports', icon: BarChart3, show: true, onClick: () => goToTab('reports') },
+          { key: 'settings', label: 'Settings', icon: Settings, show: canManage, onClick: () => goToTab('settings') },
         ]
           .filter((t) => t.show)
           .map((t) => {
             const Icon = t.icon;
-            const isActive = activeTab === t.key;
+            const isActive = currentTab === t.key || panel === t.key;
             return (
               <button
                 key={t.key}
@@ -185,41 +231,17 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
           })}
       </div>
 
+      <ErrorBoundary label="This tab" resetKey={currentTab}>
       {/* OVERVIEW TAB */}
-      {activeTab === 'overview' && (
+      {currentTab === 'overview' && (
         <div className="space-y-6">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Confirmed</span>
-              <div className="text-2xl font-extrabold text-slate-900 mt-1">
-                {event.confirmed_count || 0} / {event.capacity}
-              </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                {Math.max(0, event.capacity - (event.confirmed_count || 0))} Remaining Slots
-              </span>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Waitlist Queue</span>
-              <div className="text-2xl font-extrabold text-amber-600 mt-1">{event.waitlist_count || 0}</div>
-              <span className="text-[11px] text-slate-500 mt-1 block">FIFO Active</span>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Checked In</span>
-              <div className="text-2xl font-extrabold text-emerald-600 mt-1">{event.checked_in_count || 0}</div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Live Attendance</span>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Approvals</span>
-              <div className="text-2xl font-extrabold text-indigo-600 mt-1">{event.pending_count || 0}</div>
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                {event.approval_mode === 'manual' ? 'Manual Review' : 'Auto Approval'}
-              </span>
-            </div>
-          </div>
+          <EventOverviewTab
+            eventId={eventUuid}
+            event={event}
+            role={role}
+            onOpenTab={goToTab}
+            onEditForm={() => goToTab('form')}
+          />
 
           {/* Quick Operations Launchpad */}
           <div className="bg-slate-900 text-white rounded-3xl p-8 shadow-xl space-y-4">
@@ -231,7 +253,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
             <div className="flex flex-wrap gap-3 pt-2">
               {canCheckin && (
               <button
-                onClick={() => setActiveTab('checkin')}
+                onClick={() => goToTab('checkin')}
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-2 transition-all"
               >
                 <QrCode className="w-4 h-4" />
@@ -241,7 +263,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
 
               {canRegistrations && (
               <button
-                onClick={() => setActiveTab('queue')}
+                onClick={() => goToTab('queue')}
                 className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-2 transition-all"
               >
                 <Clock className="w-4 h-4 text-amber-400" />
@@ -251,7 +273,7 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
 
               {canManage && (
               <button
-                onClick={() => setFormModalOpen(true)}
+                onClick={() => goToTab('form')}
                 className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-2 transition-all"
               >
                 <FileEdit className="w-4 h-4 text-emerald-400" />
@@ -264,11 +286,11 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
       )}
 
       {/* REGISTRATIONS TAB */}
-      {activeTab === 'registrations' && (
+      {currentTab === 'registrations' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900">Registered Participants ({registrations.length})</h3>
-            <button onClick={fetchRegistrations} className="p-1.5 text-slate-400 hover:text-slate-600">
+            <button onClick={() => fetchRegistrations(eventUuid)} className="p-1.5 text-slate-400 hover:text-slate-600">
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
@@ -384,18 +406,39 @@ export const EventDetailManage: React.FC<EventDetailManageProps> = ({
         </div>
       )}
 
+      {/* QUEUE & WAITLIST TAB */}
+      {currentTab === 'queue' && canRegistrations && (
+        <WaitlistQueuePage eventId={eventUuid} embedded onBack={() => goToTab('overview')} />
+      )}
+
+      {/* QR CHECK-IN CONSOLE TAB */}
+      {currentTab === 'checkin' && canCheckin && (
+        <QrScannerConsole eventId={eventUuid} embedded onBack={() => goToTab('overview')} />
+      )}
+
+      {/* ATTENDANCE ROSTER TAB */}
+      {currentTab === 'attendance' && canCheckin && (
+        <AttendanceRoster eventId={eventUuid} embedded onBack={() => goToTab('overview')} />
+      )}
+
+      {/* ANALYTICS & REPORTS TAB */}
+      {currentTab === 'reports' && (
+        <EventReportsPage eventId={eventUuid} embedded onBack={() => goToTab('overview')} />
+      )}
+      </ErrorBoundary>
+
       {/* Form Builder Modal */}
       <FormBuilderModal
-        eventId={eventId}
-        isOpen={formModalOpen}
-        onClose={() => setFormModalOpen(false)}
+        eventId={eventUuid}
+        isOpen={panel === 'form'}
+        onClose={closePanel}
       />
 
       {/* Event Settings Modal */}
       <EventSettingsModal
-        eventId={eventId}
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
+        eventId={eventUuid}
+        isOpen={panel === 'settings'}
+        onClose={closePanel}
         onSaved={(ev) => setEvent(ev)}
       />
     </div>

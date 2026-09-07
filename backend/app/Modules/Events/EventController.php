@@ -103,7 +103,11 @@ class EventController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $event = Event::with(['category', 'owner', 'staff.user', 'form.fields'])->findOrFail($id);
+        // Accept either the UUID or the URL slug so the admin console can be
+        // addressed as /admin/events/{slug}. Slugs are unique (events.slug).
+        $event = Event::with(['category', 'owner', 'staff.user', 'form.fields'])
+            ->where(fn ($q) => $q->where('id', $id)->orWhere('slug', $id))
+            ->firstOrFail();
 
         $event->confirmed_count = $event->confirmedRegistrations()->count();
         $event->waitlist_count = $event->waitlistedRegistrations()->count();

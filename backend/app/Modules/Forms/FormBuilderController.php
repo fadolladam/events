@@ -4,7 +4,6 @@ namespace App\Modules\Forms;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
-use App\Models\RegistrationForm;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,9 +15,14 @@ class FormBuilderController extends Controller
 
     public function show(string $eventId): JsonResponse
     {
-        $form = RegistrationForm::where('event_id', $eventId)
-            ->with(['fields' => fn($q) => $q->orderBy('field_order', 'asc')])
-            ->firstOrFail();
+        // 404 only for an unknown event — every real event must resolve to its
+        // OWN registration form. Events created outside EventService (seeded
+        // fixtures, imports, legacy rows) may not have a form row yet; return a
+        // freshly scaffolded one for this event rather than failing, so the
+        // builder never falls back to showing another event's form.
+        Event::findOrFail($eventId);
+
+        $form = $this->formService->getOrCreateForm($eventId);
 
         return response()->json($form);
     }

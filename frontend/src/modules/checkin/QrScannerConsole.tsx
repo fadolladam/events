@@ -6,11 +6,13 @@ import { QrCode, Search, CheckCircle2, AlertTriangle, ArrowLeft, Undo2, UserChec
 interface QrScannerConsoleProps {
   eventId: string;
   onBack: () => void;
+  /** rendered inside the Event console shell — hide own page chrome */
+  embedded?: boolean;
 }
 
 const READER_ID = 'qr-reader-container';
 
-export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onBack }) => {
+export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onBack, embedded = false }) => {
   const [event, setEvent] = useState<EventItem | null>(null);
   const [manualSearch, setManualSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -38,12 +40,21 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
 
     return () => {
       const inst = qrRef.current;
-      if (inst) {
-        Promise.resolve(inst.stop()).catch(() => {}).finally(() => {
-          try { inst.clear(); } catch { /* ignore */ }
-        });
-      }
       qrRef.current = null;
+      if (!inst) return;
+      // inst.stop() throws *synchronously* if the scanner was never started —
+      // that throw must not escape a React effect cleanup (it would blank the
+      // whole console). Guard both the sync throw and the async rejection.
+      try {
+        const maybePromise = inst.stop() as unknown as Promise<void> | undefined;
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          maybePromise.catch(() => {}).finally(() => {
+            try { inst.clear(); } catch { /* ignore */ }
+          });
+          return;
+        }
+      } catch { /* scanner was not running */ }
+      try { inst.clear(); } catch { /* ignore */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
@@ -228,22 +239,28 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
   };
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
+    <div className={embedded ? 'space-y-6' : 'p-4 sm:p-8 max-w-5xl mx-auto space-y-6'}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-1 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Event</span>
-          </button>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">QR Check-In Console</h1>
-          <p className="text-xs text-slate-500">Live attendance station for {event?.title}</p>
+          {!embedded && (
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-1 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Event</span>
+            </button>
+          )}
+          <h2 className={embedded ? 'text-base font-bold text-slate-900' : 'text-2xl font-extrabold text-slate-900 tracking-tight'}>
+            QR Check-In Console
+          </h2>
+          <p className="text-xs text-slate-500">
+            {embedded ? 'Live attendance station for this event.' : `Live attendance station for ${event?.title}`}
+          </p>
         </div>
 
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Checked In</span>
           <div className="text-xl font-extrabold text-emerald-600">
             {event?.checked_in_count || 0} / {event?.confirmed_count || 0}

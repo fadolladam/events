@@ -9,9 +9,9 @@ PRIMARY BUILD TARGET: Antigravity AI Development Environment
 1. PROJECT OVERVIEW
     ======================================================================
 
-Build a production-ready web application called EventNex.
+Build a production-ready web application called Events.
 
-EventNex is a centralized multi-event management platform that allows an organization to create, publish, manage, track and report multiple events from one administration system.
+Events is a centralized multi-event management platform that allows an organization to create, publish, manage, track and report multiple events from one administration system.
 
 Each event must operate independently and have its own:
 
@@ -3232,7 +3232,7 @@ Registration #72 becomes Queue #1.
 
 Display:
 
-EVENTNEX
+EVENTS
 
 Dashboard
 

@@ -239,3 +239,240 @@ export interface AuditLog {
   ip_address?: string;
   created_at: string;
 }
+
+/* ============================================================
+ * Admin "Event Operations" dashboard — GET /dashboard/overview
+ * ============================================================ */
+
+export type DashboardRange =
+  | 'today'
+  | '7d'
+  | '30d'
+  | '90d'
+  | 'this_month'
+  | 'this_year'
+  | 'custom';
+
+export type ActionPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface DashboardActionItem {
+  priority: ActionPriority;
+  type: string;
+  event_id: string;
+  event_slug?: string;
+  event_title: string;
+  event_code: string;
+  issue: string;
+  detail: string;
+  recommended_action: string;
+  action_target: { tab: string };
+}
+
+export interface DashboardEventRow {
+  event_id: string;
+  event_slug?: string;
+  event_title: string;
+  event_code: string;
+  dynamic_status: string;
+  start_at?: string;
+  end_at?: string;
+  venue?: string | null;
+  capacity: number;
+  confirmed: number;
+  available: number;
+  waitlist: number;
+  pending: number;
+  checked_in: number;
+  attendance_pct: number;
+  registration_close_at?: string | null;
+  days_until?: number;
+}
+
+export interface DashboardTodayRow extends DashboardEventRow {
+  waitlisted: number;
+  not_checked_in: number;
+  checkin_state: string;
+}
+
+export interface DashboardTrendPoint {
+  date: string;
+  total: number;
+  confirmed: number;
+  waitlisted: number;
+  cancelled: number;
+}
+
+export interface DashboardReadiness {
+  event_id: string;
+  event_slug?: string;
+  event_title: string;
+  event_code: string;
+  ready_count: number;
+  total: number;
+  items: Array<{ label: string; ok: boolean }>;
+}
+
+export interface DashboardCapacityRow {
+  event_id: string;
+  event_slug?: string;
+  event_title: string;
+  event_code: string;
+  confirmed: number;
+  capacity: number;
+  available: number;
+  queue: number;
+  pct: number;
+  state: 'HEALTHY' | 'NEAR FULL' | 'FULL' | 'OVER CAPACITY';
+}
+
+export interface DashboardOverview {
+  filters: { range: DashboardRange; from: string | null; to: string | null };
+  generated_at: string;
+  kpis: {
+    total_events: number;
+    open_registration: number;
+    upcoming_events: number;
+    ongoing_events: number;
+    total_registrations: number;
+    confirmed: number;
+    waitlisted: number;
+    checked_in: number;
+    attendance_rate: number;
+  };
+  event_status_breakdown: Record<string, number>;
+  action_required: DashboardActionItem[];
+  active_events: DashboardEventRow[];
+  capacity_utilization: DashboardCapacityRow[];
+  waitlist: {
+    total_waitlisted: number;
+    events_with_waitlist: number;
+    largest_queue: { event_title: string; count: number } | null;
+    recent_promotions: Array<{
+      event_title?: string;
+      event_code?: string;
+      participant?: string;
+      previous_position?: number | null;
+      promoted_at?: string;
+    }>;
+    table: Array<{
+      event_id: string;
+      event_slug?: string;
+      event_title: string;
+      event_code: string;
+      capacity: number;
+      confirmed: number;
+      queue: number;
+      oldest_wait_at?: string | null;
+      registration_close_at?: string | null;
+    }>;
+  };
+  pending_approvals: {
+    total: number;
+    oldest_at: string | null;
+    events: Array<{ event_id: string; event_title: string; pending: number }>;
+    rows: Array<{
+      registration_id: string;
+      registration_number: string;
+      participant?: string;
+      email?: string;
+      event_title?: string;
+      event_slug?: string;
+      event_id: string;
+      submitted_at?: string;
+    }>;
+  } | null;
+  upcoming_events: DashboardEventRow[];
+  today_operations: DashboardTodayRow[];
+  attendance_performance: Array<{
+    event_id: string;
+    event_slug?: string;
+    event_title: string;
+    event_code: string;
+    confirmed: number;
+    checked_in: number;
+    attended: number;
+    no_show: number;
+    attendance_rate: number;
+  }>;
+  registration_trend: DashboardTrendPoint[];
+  registration_status_breakdown: {
+    confirmed: number;
+    pending: number;
+    waitlisted: number;
+    rejected: number;
+    cancelled: number;
+  };
+  recent_registrations: Array<{
+    registration_number: string;
+    participant?: string;
+    event_title?: string;
+    event_slug?: string;
+    event_id: string;
+    status: string;
+    queue_position?: number | null;
+    registered_at?: string;
+    source?: string;
+  }>;
+  recent_activity: Array<{
+    created_at?: string;
+    actor: string;
+    event_title?: string | null;
+    action: string;
+    summary: string;
+  }>;
+  notification_health: {
+    sent_today: number;
+    pending: number;
+    failed: number;
+    failed_24h: number;
+  };
+  readiness: DashboardReadiness[];
+}
+
+/* Per-event dashboard — additive keys on GET /events/{id}/analytics */
+export interface EventAnalyticsDetail {
+  event: EventItem;
+  capacity: number;
+  confirmed: number;
+  pending: number;
+  waitlisted: number;
+  cancelled: number;
+  rejected: number;
+  checked_in: number;
+  no_show: number;
+  available_capacity: number;
+  attendance_rate: number;
+  capacity_utilization: number;
+  registrations_by_date: Array<{ date: string; count: number }>;
+  sources: Array<{ source: string | null; count: number }>;
+  dynamic_status: string;
+  registration_state: 'open' | 'closing_soon' | 'closed';
+  registration_close_at?: string | null;
+  form_summary: {
+    status: 'ready' | 'empty' | 'missing';
+    active_fields: number;
+    required_fields: number;
+    optional_fields: number;
+    updated_at?: string | null;
+  };
+  queue_summary: {
+    count: number;
+    oldest_wait_at?: string | null;
+    promoted_today: number;
+    head_registration: { registration_number: string; participant?: string; waitlisted_at?: string } | null;
+    first_five: Array<{ position: number; registration_number: string; participant?: string; waitlisted_at?: string }>;
+  };
+  attendance: {
+    confirmed: number;
+    checked_in: number;
+    attended: number;
+    not_checked_in: number;
+    no_show: number;
+    present: number;
+    attendance_rate: number;
+    last_check_in_at?: string | null;
+  };
+  notifications: { sent: number; scheduled: number; pending: number; failed: number; last_at?: string | null };
+  activity: Array<{ created_at?: string; actor: string; action: string; summary: string }>;
+  trend: DashboardTrendPoint[];
+}

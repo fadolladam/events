@@ -1,20 +1,29 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient, EventItem, getStoredUser, ROLE_TIERS, hasRole } from '../../services/api';
-import { Plus, Search, Filter, QrCode, Clock, Users, FileEdit, Copy, Trash2, ArrowRight } from 'lucide-react';
+import { Plus, Search, QrCode, Clock, Copy, Trash2 } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
+import { paths } from '../../routes/paths';
+import { useAdminUI } from '../../components/AdminLayout';
 
-interface EventsManagementProps {
-  onCreateEvent: () => void;
-  onSelectEvent: (event: EventItem, tab?: string) => void;
-}
+export const EventsManagement: React.FC = () => {
+  const navigate = useNavigate();
+  const { openCreateEvent } = useAdminUI();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFilter = searchParams.get('status') ?? '';
+  const setStatusFilter = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('status', value);
+    else next.delete('status');
+    setSearchParams(next, { replace: true });
+  };
 
-export const EventsManagement: React.FC<EventsManagementProps> = ({
-  onCreateEvent,
-  onSelectEvent,
-}) => {
+  const onCreateEvent = openCreateEvent;
+  const onSelectEvent = (event: EventItem, tab: string = 'overview') =>
+    navigate(paths.eventConsole(event.slug, tab));
+
   const [events, setEvents] = useState<EventItem[]>([]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
   const role = getStoredUser()?.role;

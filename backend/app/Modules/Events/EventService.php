@@ -43,6 +43,13 @@ class EventService
             $data['created_by'] = $userId;
             $data['owner_user_id'] = $data['owner_user_id'] ?? $userId;
 
+            // An "upcoming" event whose registration window never opens would be
+            // reported as already open by calculateDynamicStatus(). Default the
+            // opening time to the event start so the status resolves correctly.
+            if (($data['status'] ?? null) === 'upcoming' && empty($data['registration_open_at']) && ! empty($data['start_at'])) {
+                $data['registration_open_at'] = $data['start_at'];
+            }
+
             $event = Event::create($data);
 
             // Create default registration form for this event

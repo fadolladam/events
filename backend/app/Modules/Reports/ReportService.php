@@ -2,11 +2,14 @@
 
 namespace App\Modules\Reports;
 
+use App\Models\AuditLog;
 use App\Models\Checkin;
 use App\Models\Event;
+use App\Models\NotificationLog;
 use App\Models\Participant;
 use App\Models\Registration;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -71,8 +74,15 @@ class ReportService
         $checkedIn = Registration::where('event_id', $eventId)->where('attendance_status', 'checked_in')->count();
         $noShow = Registration::where('event_id', $eventId)->where('attendance_status', 'no_show')->count();
 
+        $attended = Registration::where('event_id', $eventId)->where('attendance_status', 'attended')->count();
+        $notCheckedIn = Registration::where('event_id', $eventId)
+            ->where('status', 'confirmed')
+            ->where('attendance_status', 'not_checked_in')
+            ->count();
+        $present = $checkedIn + $attended;
+
         $availableCapacity = max(0, $event->capacity - $confirmed);
-        $attendanceRate = $confirmed > 0 ? round(($checkedIn / $confirmed) * 100, 1) : 0;
+        $attendanceRate = $confirmed > 0 ? round(($present / $confirmed) * 100, 1) : 0;
         $capacityUtilization = $event->capacity > 0 ? round(($confirmed / $event->capacity) * 100, 1) : 0;
 
         // Registrations grouped by date
@@ -88,7 +98,7 @@ class ReportService
             ->groupBy('source')
             ->get();
 
-        return [
+        return array_merge([
             'event' => $event,
             'capacity' => $event->capacity,
             'confirmed' => $confirmed,
@@ -103,6 +113,149 @@ class ReportService
             'capacity_utilization' => $capacityUtilization,
             'registrations_by_date' => $registrationsByDate,
             'sources' => $sources,
+        ], $this->eventOperationsDetail($event, [
+            'confirmed' => $confirmed,
+            'waitlisted' => $waitlisted,
+            'checked_in' => $checkedIn,
+            'attended' => $attended,
+            'not_checked_in' => $notCheckedIn,
+            'no_show' => $noShow,
+            'present' => $present,
+            'attendance_rate' => $attendanceRate,
+        ]));
+    }
+
+    /**
+     * Operational detail blocks for the per-event dashboard (form readiness,
+     * queue head, attendance, notifications, activity, status-split trend).
+     * Additive — the legacy keys above are untouched.
+     */
+    private function eventOperationsDetail(Event $event, array $c): array
+    {
+        $now = now();
+        $eventId = $event->id;
+
+        // ---- registration state ---------------------------------------------
+        $dynamicStatus = $event->calculateDynamicStatus($c['confirmed'], $c['waitlisted']);
+        if (in_array($dynamicStatus, ['registration_closed', 'completed', 'cancelled', 'archived', 'full'], true)) {
+            $registrationState = 'closed';
+        } elseif ($event->registration_close_at && $event->registration_close_at->isBetween($now, $now->copy()->addDay())) {
+            $registrationState = 'closing_soon';
+        } else {
+            $registrationState = 'open';
+        }
+
+        // ---- form summary (read-only; uses the event's own form relation) ---
+        $form = $event->form()->with('fields')->first();
+        $activeFields = $form ? $form->fields->where('is_hidden', false) : collect();
+        $formSummary = [
+            'status' => $form ? ($activeFields->isEmpty() ? 'empty' : 'ready') : 'missing',
+            'active_fields' => $activeFields->count(),
+            'required_fields' => $activeFields->where('is_required', true)->count(),
+            'optional_fields' => $activeFields->where('is_required', false)->count(),
+            'updated_at' => $form?->updated_at?->toIso8601String(),
+        ];
+
+        // ---- queue summary -------------------------------------------------
+        $queueHead = Registration::where('event_id', $eventId)
+            ->where('status', 'waitlisted')
+            ->with('participant:id,name')
+            ->orderBy('waitlist_priority', 'desc')
+            ->orderBy('waitlisted_at', 'asc')
+            ->orderBy('registration_sequence', 'asc')
+            ->limit(5)
+            ->get();
+
+        $promotedToday = Registration::where('event_id', $eventId)
+            ->whereNotNull('promoted_at')
+            ->where('promoted_at', '>=', $now->copy()->startOfDay())
+            ->count();
+
+        $queueSummary = [
+            'count' => $c['waitlisted'],
+            'oldest_wait_at' => optional($queueHead->first())->waitlisted_at?->toIso8601String(),
+            'promoted_today' => $promotedToday,
+            'head_registration' => $queueHead->first() ? [
+                'registration_number' => $queueHead->first()->registration_number,
+                'participant' => $queueHead->first()->participant?->name,
+                'waitlisted_at' => $queueHead->first()->waitlisted_at?->toIso8601String(),
+            ] : null,
+            'first_five' => $queueHead->values()->map(fn ($reg, $i) => [
+                'position' => $i + 1,
+                'registration_number' => $reg->registration_number,
+                'participant' => $reg->participant?->name,
+                'waitlisted_at' => $reg->waitlisted_at?->toIso8601String(),
+            ])->all(),
+        ];
+
+        // ---- attendance ---------------------------------------------------
+        $lastCheckIn = Checkin::where('event_id', $eventId)->max('checked_in_at');
+        $attendance = [
+            'confirmed' => $c['confirmed'],
+            'checked_in' => $c['checked_in'],
+            'attended' => $c['attended'],
+            'not_checked_in' => $c['not_checked_in'],
+            'no_show' => $c['no_show'],
+            'present' => $c['present'],
+            'attendance_rate' => $c['attendance_rate'],
+            'last_check_in_at' => $lastCheckIn ? Carbon::parse($lastCheckIn)->toIso8601String() : null,
+        ];
+
+        // ---- notifications (send path is NOTIF-1; currently all zero) ------
+        $notifCounts = NotificationLog::where('event_id', $eventId)
+            ->selectRaw('status, count(*) c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
+        $notifications = [
+            'sent' => (int) ($notifCounts['sent'] ?? 0),
+            'scheduled' => 0,
+            'pending' => (int) ($notifCounts['queued'] ?? 0),
+            'failed' => (int) ($notifCounts['failed'] ?? 0),
+            'last_at' => optional(NotificationLog::where('event_id', $eventId)->max('created_at'), fn ($v) => Carbon::parse($v)->toIso8601String()),
+        ];
+
+        // ---- activity feed ----------------------------------------------
+        $activity = AuditLog::where('event_id', $eventId)
+            ->orderByDesc('created_at')
+            ->limit(15)
+            ->get()
+            ->map(fn ($log) => [
+                'created_at' => $log->created_at?->toIso8601String(),
+                'actor' => $log->user_name ?? 'System',
+                'action' => $log->action,
+                'summary' => ucfirst(str_replace('_', ' ', $log->action)),
+            ])
+            ->all();
+
+        // ---- status-split trend --------------------------------------------
+        $trendRaw = Registration::where('event_id', $eventId)
+            ->selectRaw('DATE(registered_at) d, status, count(*) c')
+            ->groupBy('d', 'status')
+            ->get();
+        $trendByDate = [];
+        foreach ($trendRaw as $g) {
+            $trendByDate[$g->d] ??= ['total' => 0, 'confirmed' => 0, 'waitlisted' => 0, 'cancelled' => 0];
+            $trendByDate[$g->d]['total'] += $g->c;
+            if (isset($trendByDate[$g->d][$g->status])) {
+                $trendByDate[$g->d][$g->status] += $g->c;
+            }
+        }
+        ksort($trendByDate);
+        $trend = [];
+        foreach ($trendByDate as $date => $vals) {
+            $trend[] = array_merge(['date' => $date], $vals);
+        }
+
+        return [
+            'dynamic_status' => $dynamicStatus,
+            'registration_state' => $registrationState,
+            'registration_close_at' => $event->registration_close_at?->toIso8601String(),
+            'form_summary' => $formSummary,
+            'queue_summary' => $queueSummary,
+            'attendance' => $attendance,
+            'notifications' => $notifications,
+            'activity' => $activity,
+            'trend' => $trend,
         ];
     }
 

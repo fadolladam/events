@@ -5,9 +5,11 @@ import { CheckCircle2, Clock, XCircle, ArrowLeft, Search, Filter } from 'lucide-
 interface AttendanceRosterProps {
   eventId: string;
   onBack: () => void;
+  /** rendered inside the Event console shell — hide own page chrome */
+  embedded?: boolean;
 }
 
-export const AttendanceRoster: React.FC<AttendanceRosterProps> = ({ eventId, onBack }) => {
+export const AttendanceRoster: React.FC<AttendanceRosterProps> = ({ eventId, onBack, embedded = false }) => {
   const [event, setEvent] = useState<EventItem | null>(null);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
@@ -59,21 +61,28 @@ export const AttendanceRoster: React.FC<AttendanceRosterProps> = ({ eventId, onB
   });
 
   return (
-    <div className="p-6 sm:p-8 space-y-6 max-w-6xl mx-auto">
+    <div className={embedded ? 'space-y-6' : 'p-6 sm:p-8 space-y-6 max-w-6xl mx-auto'}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {embedded ? (
         <div>
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-1 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Event</span>
-          </button>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Attendance Roster</h1>
-          <p className="text-xs text-slate-500">Track and manage attendance records for {event?.title}</p>
+          <h2 className="text-base font-bold text-slate-900">Attendance Roster</h2>
+          <p className="text-xs text-slate-500">Track and manage attendance records for this event.</p>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-1 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Event</span>
+            </button>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Attendance Roster</h1>
+            <p className="text-xs text-slate-500">Track and manage attendance records for {event?.title}</p>
+          </div>
+        </div>
+      )}
 
       {/* Filter & Search Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row gap-3">

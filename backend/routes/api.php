@@ -4,6 +4,7 @@ use App\Modules\Audit\AuditController;
 use App\Modules\Auth\AuthController;
 use App\Modules\Attendance\AttendanceController;
 use App\Modules\CheckIn\CheckInController;
+use App\Modules\Dashboard\DashboardController;
 use App\Modules\Events\EventCategoryController;
 use App\Modules\Events\EventController;
 use App\Modules\Events\EventTemplateController;
@@ -69,6 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::middleware(ROLE_STAFF)->group(function () {
         Route::get('/dashboard/stats', [ReportController::class, 'globalStats']);
+        Route::get('/dashboard/overview', [DashboardController::class, 'overview']);
         Route::get('/events/{eventId}/analytics', [ReportController::class, 'eventStats']);
 
         Route::get('/events', [EventController::class, 'index']);

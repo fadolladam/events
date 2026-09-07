@@ -1,6 +1,6 @@
-# EventNex: Multi-Event Registration, FIFO Waitlist Queue, QR Ticketing & Check-In Platform
+# Events: Multi-Event Registration, FIFO Waitlist Queue, QR Ticketing & Check-In Platform
 
-EventNex is a modular, production-grade event management platform built according to [prd.md](file:///Users/fadolla-mini/Developer/events/prd.md) and [stack.md](file:///Users/fadolla-mini/Developer/events/stack.md).
+Events is a modular, production-grade event management platform built according to [prd.md](file:///Users/fadolla-mini/Developer/events/prd.md) and [stack.md](file:///Users/fadolla-mini/Developer/events/stack.md).
 
 The codebase is strictly separated into **`backend/`** and **`frontend/`** and designed with a **decoupled, standalone feature module architecture**.
 
@@ -118,9 +118,9 @@ The frontend will run on **`http://localhost:5173`** and proxy all API calls aut
 
 | Role | Email | Password |
 |---|---|---|
-| **Super Admin** | `superadmin@eventnex.com` | `password123` |
-| **Event Admin** | `manager@eventnex.com` | `password123` |
-| **Check-In Staff** | `staff@eventnex.com` | `password123` |
+| **Super Admin** | `superadmin@rhbgroup.com` | `password123` |
+| **Event Admin** | `manager@rhbgroup.com` | `password123` |
+| **Check-In Staff** | `staff@rhbgroup.com` | `password123` |
 
 ---
 

@@ -5,9 +5,11 @@ import { Download, FileText, ArrowLeft, TrendingUp, Users, CheckCircle2, Clock }
 interface EventReportsPageProps {
   eventId: string;
   onBack: () => void;
+  /** rendered inside the Event console shell — hide own page chrome */
+  embedded?: boolean;
 }
 
-export const EventReportsPage: React.FC<EventReportsPageProps> = ({ eventId, onBack }) => {
+export const EventReportsPage: React.FC<EventReportsPageProps> = ({ eventId, onBack, embedded = false }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,40 +43,53 @@ export const EventReportsPage: React.FC<EventReportsPageProps> = ({ eventId, onB
 
   const { event } = data;
 
+  const exportButtons = (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={handleDownloadCsv}
+        className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-xs flex items-center gap-2 transition-all"
+      >
+        <Download className="w-4 h-4 text-emerald-600" />
+        <span>Export CSV</span>
+      </button>
+
+      <button
+        onClick={handleDownloadPdf}
+        className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs flex items-center gap-2 transition-all"
+      >
+        <FileText className="w-4 h-4 text-indigo-400" />
+        <span>Download PDF Report</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="p-6 sm:p-8 space-y-6 max-w-6xl mx-auto">
+    <div className={embedded ? 'space-y-6' : 'p-6 sm:p-8 space-y-6 max-w-6xl mx-auto'}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-1 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Event</span>
-          </button>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Event Analytics & Exports</h1>
-          <p className="text-xs text-slate-500">Live reporting metrics for {event.title} ({event.event_code})</p>
+      {embedded ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Event Analytics &amp; Exports</h2>
+            <p className="text-xs text-slate-500">Live reporting metrics and downloadable reports.</p>
+          </div>
+          {exportButtons}
         </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleDownloadCsv}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-xs flex items-center gap-2 transition-all"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
-            onClick={handleDownloadPdf}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs flex items-center gap-2 transition-all"
-          >
-            <FileText className="w-4 h-4 text-indigo-400" />
-            <span>Download PDF Report</span>
-          </button>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-1 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Event</span>
+            </button>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Event Analytics &amp; Exports</h1>
+            <p className="text-xs text-slate-500">Live reporting metrics for {event.title} ({event.event_code})</p>
+          </div>
+          {exportButtons}
         </div>
-      </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

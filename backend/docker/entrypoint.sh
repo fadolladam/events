@@ -26,6 +26,7 @@ sync_env() {
 }
 sync_env APP_NAME "$APP_NAME"
 sync_env APP_ENV "$APP_ENV"
+sync_env APP_KEY "$APP_KEY"
 sync_env CORS_ALLOWED_ORIGINS "$CORS_ALLOWED_ORIGINS"
 sync_env SANCTUM_TOKEN_EXPIRATION "$SANCTUM_TOKEN_EXPIRATION"
 sync_env APP_DEBUG "$APP_DEBUG"
@@ -37,8 +38,8 @@ sync_env DB_DATABASE "$DB_DATABASE"
 sync_env DB_USERNAME "$DB_USERNAME"
 sync_env DB_PASSWORD "$DB_PASSWORD"
 
-# Generate APP_KEY if empty
-if ! grep -q "APP_KEY=base64:" .env && [ -z "$APP_KEY" ]; then
+# Generate an APP_KEY only if one was neither baked into .env nor passed in.
+if ! grep -q "APP_KEY=base64:" .env; then
   php artisan key:generate --force
 fi
 

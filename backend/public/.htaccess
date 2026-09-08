@@ -3,6 +3,12 @@
         Options -MultiViews -Indexes
     </IfModule>
 
+    # Always route "/" through Laravel (which serves the built SPA shell),
+    # never let Apache auto-serve the static index.html for the directory.
+    <IfModule mod_dir.c>
+        DirectoryIndex index.php
+    </IfModule>
+
     RewriteEngine On
 
     # Handle Authorization Header

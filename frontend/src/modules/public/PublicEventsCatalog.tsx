@@ -3,6 +3,7 @@ import { apiClient, EventCategory, EventItem } from '../../services/api';
 import { Calendar, MapPin, Users, Search, Filter, ArrowRight, ShieldCheck, Ticket, LayoutGrid } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
 import { BrandMark } from '../../components/BrandMark';
+import { formatInZone } from '../../utils/tz';
 
 interface PublicEventsCatalogProps {
   onSelectEvent: (event: EventItem) => void;
@@ -211,7 +212,6 @@ export const PublicEventsCatalog: React.FC<PublicEventsCatalogProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {events.map((event) => {
-                const startDate = new Date(event.start_at);
                 const capacityPercent = event.capacity > 0 ? Math.min(100, Math.round(((event.confirmed_count || 0) / event.capacity) * 100)) : 0;
 
                 return (
@@ -259,7 +259,7 @@ export const PublicEventsCatalog: React.FC<PublicEventsCatalogProps> = ({
                       <div className="space-y-2 text-xs text-slate-600 pt-2 border-t border-slate-100">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span>{startDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>{formatInZone(event.start_at, event.timezone, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {formatInZone(event.start_at, event.timezone, { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-slate-400 shrink-0" />

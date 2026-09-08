@@ -70,6 +70,23 @@ export function zonedInputToIso(
 export const browserTimeZone = (): string =>
   Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
+/** Format a UTC ISO instant for display in a specific IANA zone. Falls back to
+ *  the viewer's zone when `timeZone` is absent or not recognised. */
+export function formatInZone(
+  iso: string | null | undefined,
+  timeZone: string | null | undefined,
+  opts: Intl.DateTimeFormatOptions,
+): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat(undefined, { ...opts, timeZone: timeZone || undefined }).format(d);
+  } catch {
+    return new Intl.DateTimeFormat(undefined, opts).format(d);
+  }
+}
+
 /** Short offset label for a zone, e.g. "GMT+8". Empty string if unresolvable. */
 export function tzOffsetLabel(timeZone: string, at: Date = new Date()): string {
   try {

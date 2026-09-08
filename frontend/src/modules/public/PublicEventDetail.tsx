@@ -3,6 +3,7 @@ import { EventItem } from '../../services/api';
 import { Calendar, MapPin, Users, Clock, ShieldAlert, ArrowLeft, CheckCircle2, AlertCircle, Share2, FileText, ExternalLink } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
 import { BrandMark } from '../../components/BrandMark';
+import { formatInZone } from '../../utils/tz';
 
 interface PublicEventDetailProps {
   event: EventItem;
@@ -15,10 +16,31 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
   onBack,
   onRegisterNow,
 }) => {
-  const startDate = new Date(event.start_at);
-  const endDate = new Date(event.end_at);
   const isFull = (event.confirmed_count || 0) >= event.capacity;
   const isRegistrationOpen = event.dynamic_status === 'registration_open' || (!event.dynamic_status && event.status === 'registration_open');
+
+  const regStatus = ((): { label: string; dot: string } => {
+    switch (event.dynamic_status) {
+      case 'upcoming':
+        return { label: 'Opens Soon', dot: 'bg-amber-500' };
+      case 'registration_closed':
+        return { label: 'Registration Closed', dot: 'bg-slate-400' };
+      case 'completed':
+        return { label: 'Event Ended', dot: 'bg-slate-400' };
+      case 'cancelled':
+        return { label: 'Cancelled', dot: 'bg-red-500' };
+      case 'ongoing':
+        return { label: 'Event In Progress', dot: 'bg-emerald-500' };
+      case 'full':
+        return event.waitlist_enabled
+          ? { label: 'Waitlist Open', dot: 'bg-amber-500' }
+          : { label: 'Full', dot: 'bg-red-500' };
+      default:
+        return isFull
+          ? { label: event.waitlist_enabled ? 'Waitlist Open' : 'Full', dot: event.waitlist_enabled ? 'bg-amber-500' : 'bg-red-500' }
+          : { label: 'Open for RSVP', dot: 'bg-emerald-500' };
+    }
+  })();
 
   const getCtaButton = () => {
     if (event.dynamic_status === 'upcoming') {
@@ -132,7 +154,7 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
                   <Calendar className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
                   <div>
                     <div className="font-semibold text-slate-900">Date</div>
-                    <div>{startDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                    <div>{formatInZone(event.start_at, event.timezone, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
                   </div>
                 </div>
 
@@ -140,7 +162,7 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
                   <Clock className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
                   <div>
                     <div className="font-semibold text-slate-900">Time</div>
-                    <div>{startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({event.timezone})</div>
+                    <div>{formatInZone(event.start_at, event.timezone, { hour: '2-digit', minute: '2-digit' })} - {formatInZone(event.end_at, event.timezone, { hour: '2-digit', minute: '2-digit' })} ({event.timezone})</div>
                   </div>
                 </div>
 
@@ -214,10 +236,8 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
               <div>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Registration Status</span>
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-xl font-bold text-slate-900">
-                    {isFull ? 'Waitlist Open' : 'Open for RSVP'}
-                  </span>
-                  <span className={`w-3 h-3 rounded-full ${isFull ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                  <span className="text-xl font-bold text-slate-900">{regStatus.label}</span>
+                  <span className={`w-3 h-3 rounded-full ${regStatus.dot}`} />
                 </div>
               </div>
 

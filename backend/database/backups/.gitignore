@@ -1,0 +1,7 @@
+# Database dumps are backups, not source — keep them out of version control.
+# Track this folder (via README) but ignore the dump files themselves.
+*.sql
+*.sql.gz
+*.dump
+!.gitignore
+!README.md

@@ -41,7 +41,7 @@ class FreshProjectSeeder extends Seeder
 
         // --- Staff logins (all password: password123) -------------------
         $users = collect([
-            ['Super Administrator', 'superadmin@rhbgroup.com', 'super_admin'],
+            ['Adam Fadhlullah', 'adam.fadhlullah@rhbgroup.com', 'super_admin'],
             ['Sarah Jenkins', 'manager@rhbgroup.com', 'event_admin'],
             ['Aidan Lim', 'organizer@rhbgroup.com', 'event_organizer'],
             ['Priya Nair', 'registration@rhbgroup.com', 'registration_officer'],

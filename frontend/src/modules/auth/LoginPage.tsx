@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { apiClient, User } from '../../services/api';
-import { Shield, KeyRound, UserCheck, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { BrandMark } from '../../components/BrandMark';
 
 interface LoginPageProps {
@@ -41,12 +41,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onCancel }
     } finally {
       setLoading(false);
     }
-  };
-
-  const selectDemoAccount = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('password123');
-    handleLogin(undefined, demoEmail, 'password123');
   };
 
   return (
@@ -107,44 +101,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onCancel }
             )}
           </button>
         </form>
-
-        {/* Demo Fast Login Switcher */}
-        <div className="mt-8 pt-6 border-t border-slate-700/60">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-center mb-3">
-            Quick Demo Accounts
-          </p>
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              onClick={() => selectDemoAccount('superadmin@rhbgroup.com')}
-              className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-xs text-slate-200 border border-slate-600/50 transition-all"
-            >
-              <span className="flex items-center gap-2 font-medium text-indigo-300">
-                <Shield className="w-3.5 h-3.5" /> Super Admin
-              </span>
-              <span className="text-slate-400">superadmin@rhbgroup.com</span>
-            </button>
-
-            <button
-              onClick={() => selectDemoAccount('manager@rhbgroup.com')}
-              className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-xs text-slate-200 border border-slate-600/50 transition-all"
-            >
-              <span className="flex items-center gap-2 font-medium text-emerald-300">
-                <UserCheck className="w-3.5 h-3.5" /> Event Admin
-              </span>
-              <span className="text-slate-400">manager@rhbgroup.com</span>
-            </button>
-
-            <button
-              onClick={() => selectDemoAccount('staff@rhbgroup.com')}
-              className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-xs text-slate-200 border border-slate-600/50 transition-all"
-            >
-              <span className="flex items-center gap-2 font-medium text-amber-300">
-                <KeyRound className="w-3.5 h-3.5" /> Check-In Staff
-              </span>
-              <span className="text-slate-400">staff@rhbgroup.com</span>
-            </button>
-          </div>
-        </div>
 
         {onCancel && (
           <div className="text-center mt-6">

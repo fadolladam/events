@@ -42,8 +42,8 @@ class DatabaseSeeder extends Seeder
 
         // 2. Demo Users
         $superAdmin = User::create([
-            'name' => 'Super Administrator',
-            'email' => 'superadmin@rhbgroup.com',
+            'name' => 'Adam Fadhlullah',
+            'email' => 'adam.fadhlullah@rhbgroup.com',
             'password' => Hash::make('password123'),
             'role' => 'super_admin',
             'organization_id' => $org->id,

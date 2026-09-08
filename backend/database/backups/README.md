@@ -33,4 +33,4 @@ docker compose exec -T events-db mysql -u root -proot_secret \
 
 | File | Taken | Contents |
 |------|-------|----------|
-| `events_backup_20260908_132308.sql` | 2026-09-08 13:23 (+07) | 30 tables · 3 events (Badminton, Blood Donation, Angkor Wat) · 82 registrations · 5 users. All events on `Asia/Phnom_Penh`, organizer "MARCOM & HR". |
+| `events_backup_20260908_133117.sql` | 2026-09-08 13:31 (+07) | 30 tables · 3 events (Badminton, Blood Donation, Angkor Wat) · 82 registrations · 5 users. All events on `Asia/Phnom_Penh`, organizer "MARCOM & HR". Super-admin login is now `adam.fadhlullah@rhbgroup.com`. |

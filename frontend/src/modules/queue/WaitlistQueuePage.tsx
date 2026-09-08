@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, EventItem, Registration } from '../../services/api';
 import { Clock, Users, ArrowUpCircle, ShieldCheck, History, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 interface WaitlistQueuePageProps {
   eventId: string;
@@ -17,6 +18,8 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
   const [loading, setLoading] = useState(true);
   const [promoting, setPromoting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<Registration | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -52,6 +55,23 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
       alert(err.response?.data?.message || 'Failed to promote waitlisted attendees.');
     } finally {
       setPromoting(false);
+    }
+  };
+
+  const confirmRemoveFromQueue = async (reason: string) => {
+    if (!removeTarget) return;
+    setRemoving(true);
+    try {
+      await apiClient.post(`/registrations/${removeTarget.id}/cancel`, {
+        reason: reason || 'Removed from waiting list by administrator',
+      });
+      setRemoveTarget(null);
+      setMessage('Removed from the waiting list.');
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to remove this person from the queue.');
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -225,9 +245,12 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
                         </select>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          Permanent ID Retained
-                        </span>
+                        <button
+                          onClick={() => setRemoveTarget(reg)}
+                          className="px-2.5 py-1 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-[11px]"
+                        >
+                          Remove
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -237,6 +260,29 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        title="Remove from the waiting list?"
+        tone="danger"
+        busy={removing}
+        withReason
+        reasonLabel="Reason (optional, recorded in the audit log)"
+        reasonPlaceholder="e.g. no longer able to attend"
+        confirmLabel="Remove from queue"
+        cancelLabel="Keep in queue"
+        onClose={() => !removing && setRemoveTarget(null)}
+        onConfirm={confirmRemoveFromQueue}
+        message={
+          removeTarget && (
+            <p>
+              <span className="font-semibold text-slate-900">{removeTarget.participant.name}</span>{' '}
+              <span className="font-mono text-slate-500">({removeTarget.registration_number})</span> will be
+              cancelled and dropped from the queue. Everyone behind them moves up a place.
+            </p>
+          )
+        }
+      />
 
       {/* Tab 2: History Log */}
       {activeTab === 'history' && (

@@ -10,6 +10,7 @@ import { FormBuilderModal } from '../forms/FormBuilderModal';
 import { EventOverviewTab } from './EventOverviewTab';
 import { EventSettingsModal } from './EventSettingsModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import {
   LayoutDashboard,
   Users,
@@ -57,6 +58,8 @@ export const EventDetailManage: React.FC = () => {
   });
   const [regLoading, setRegLoading] = useState(false);
   const [expandedRegId, setExpandedRegId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Registration | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -155,6 +158,24 @@ export const EventDetailManage: React.FC = () => {
       fetchEvent();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update status.');
+    }
+  };
+
+  // Cancel a registration. If the person held a confirmed seat, the backend
+  // auto-promotes the next person off the waiting list into it.
+  const confirmCancelRegistration = async (reason: string) => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await apiClient.post(`/registrations/${cancelTarget.id}/cancel`, {
+        reason: reason || 'Cancelled by administrator',
+      });
+      setCancelTarget(null);
+      await Promise.all([fetchRegistrations(eventUuid, regPage, regPerPage), fetchEvent()]);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to cancel this registration.');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -367,16 +388,17 @@ export const EventDetailManage: React.FC = () => {
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Attendance</th>
                   <th className="py-3 px-4 whitespace-nowrap">Registered On <span className="normal-case font-normal text-slate-300">(local time)</span></th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {regMeta.total === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">No registrations recorded yet.</td>
+                    <td colSpan={8} className="py-12 text-center text-slate-400">No registrations recorded yet.</td>
                   </tr>
                 ) : registrations.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
                       {regLoading ? 'Loading…' : 'No registrations on this page.'}
                     </td>
                   </tr>
@@ -425,11 +447,24 @@ export const EventDetailManage: React.FC = () => {
                             {r.attendance_status.replace('_', ' ')}
                           </td>
                           <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap tabular-nums">{fmtRegisteredAt(r.registered_at)}</td>
+                          <td className="py-3.5 px-4 text-right">
+                            {['confirmed', 'waitlisted', 'pending', 'approved'].includes(r.status) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCancelTarget(r);
+                                }}
+                                className="px-2.5 py-1 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-[11px]"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </td>
                         </tr>
 
                         {isOpen && (
                           <tr className="bg-slate-50/60">
-                            <td colSpan={7} className="px-4 py-4">
+                            <td colSpan={8} className="px-4 py-4">
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
                                 {extras
                                   .filter(([, v]) => v)
@@ -531,6 +566,38 @@ export const EventDetailManage: React.FC = () => {
         isOpen={panel === 'settings'}
         onClose={closePanel}
         onSaved={(ev) => setEvent(ev)}
+      />
+
+      <ConfirmDialog
+        open={!!cancelTarget}
+        title="Cancel this registration?"
+        tone="danger"
+        busy={cancelling}
+        withReason
+        reasonLabel="Reason (optional, recorded in the audit log)"
+        reasonPlaceholder="e.g. requested by participant, duplicate entry"
+        confirmLabel="Cancel registration"
+        cancelLabel="Keep it"
+        onClose={() => !cancelling && setCancelTarget(null)}
+        onConfirm={confirmCancelRegistration}
+        message={
+          cancelTarget && (
+            <>
+              <p>
+                <span className="font-semibold text-slate-900">{cancelTarget.participant.name}</span>{' '}
+                <span className="font-mono text-slate-500">({cancelTarget.registration_number})</span> will be
+                marked <span className="font-semibold">cancelled</span>.
+              </p>
+              {cancelTarget.status === 'confirmed' ? (
+                <p className="mt-2 text-slate-500">
+                  Their seat is freed and the next person on the waiting list is moved in automatically.
+                </p>
+              ) : cancelTarget.status === 'waitlisted' ? (
+                <p className="mt-2 text-slate-500">They are removed from the queue; everyone behind moves up.</p>
+              ) : null}
+            </>
+          )
+        }
       />
     </div>
   );

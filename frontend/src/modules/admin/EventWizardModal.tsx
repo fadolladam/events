@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, EventAttachment, EventCategory, EventItem } from '../../services/api';
 import { ImageUploadField } from '../../components/ImageUploadField';
+import { TimezoneSelect } from '../../components/TimezoneSelect';
+import { zonedInputToIso, browserTimeZone, tzOffsetLabel } from '../../utils/tz';
 import { X, ArrowRight, ArrowLeft, Check, Calendar, MapPin, Users, ShieldAlert, Sparkles, Plus, Trash2, Image as ImageIcon, Paperclip } from 'lucide-react';
 
 interface EventWizardModalProps {
@@ -9,22 +11,14 @@ interface EventWizardModalProps {
   onEventCreated: (event: EventItem) => void;
 }
 
-/** Format a Date as a local `YYYY-MM-DDTHH:mm` string for <input type="datetime-local">. */
+/** Format a Date as a `YYYY-MM-DDTHH:mm` string for <input type="datetime-local">,
+ *  using the browser's local calendar fields (only used for the seeded defaults). */
 const toLocalInput = (d: Date): string => {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
 const nowLocalInput = (): string => toLocalInput(new Date());
-
-/** `datetime-local` values are local wall-clock with no zone; convert to a UTC
- *  ISO string so the API stores the instant the user picked, not a 0-offset
- *  reinterpretation of the same digits. */
-const localInputToIso = (v?: string): string | undefined => {
-  if (!v) return undefined;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-};
 
 export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   isOpen,
@@ -53,9 +47,7 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   const [endDate, setEndDate] = useState('');
   const [regOpenAt, setRegOpenAt] = useState('');
   const [regCloseAt, setRegCloseAt] = useState('');
-  const [timezone, setTimezone] = useState(
-    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-  );
+  const [timezone, setTimezone] = useState(browserTimeZone());
 
   // Capacity & Queue
   const [capacity, setCapacity] = useState(100);
@@ -92,6 +84,7 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
     setEndDate(toLocalInput(end));
     setRegOpenAt('');
     setRegCloseAt('');
+    setTimezone(browserTimeZone());
     setCurrentStep(1);
     setError(null);
     setLoading(false);
@@ -135,10 +128,16 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   };
 
   const handleSubmit = async () => {
+    // Wall-clock inputs are interpreted in the event's chosen time zone, then
+    // resolved to UTC instants for both the sanity checks and the payload.
+    const startIso = zonedInputToIso(startDate, timezone);
+    const endIso = zonedInputToIso(endDate, timezone);
+    const regCloseIso = zonedInputToIso(regCloseAt, timezone);
+
     // Client-side date sanity — the API rejects these too, but catching them
     // here gives a clear message on the right step instead of a generic error.
-    const startMs = new Date(startDate).getTime();
-    const endMs = new Date(endDate).getTime();
+    const startMs = startIso ? new Date(startIso).getTime() : NaN;
+    const endMs = endIso ? new Date(endIso).getTime() : NaN;
     if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
       setCurrentStep(2);
       setError('Please set a valid start and end date/time.');
@@ -154,7 +153,7 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
       setError('The end date/time must be after the start.');
       return;
     }
-    if (regCloseAt && new Date(regCloseAt).getTime() > startMs) {
+    if (regCloseIso && new Date(regCloseIso).getTime() > startMs) {
       setCurrentStep(2);
       setError('Registration must close on or before the event starts.');
       return;
@@ -180,10 +179,10 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
         event_type: eventType,
         visibility,
         status,
-        start_at: localInputToIso(startDate),
-        end_at: localInputToIso(endDate),
-        registration_open_at: localInputToIso(resolvedRegOpen),
-        registration_close_at: localInputToIso(regCloseAt),
+        start_at: startIso,
+        end_at: endIso,
+        registration_open_at: zonedInputToIso(resolvedRegOpen, timezone),
+        registration_close_at: regCloseIso,
         timezone,
         capacity: Number(capacity),
         waitlist_enabled: waitlistEnabled,
@@ -392,6 +391,21 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
           {/* STEP 2: Date & Venue */}
           {currentStep === 2 && (
             <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Event Time Zone
+                </label>
+                <TimezoneSelect
+                  value={timezone}
+                  onChange={setTimezone}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Start, end and registration times below are all in this zone
+                  {tzOffsetLabel(timezone) ? ` (${tzOffsetLabel(timezone)})` : ''}.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">

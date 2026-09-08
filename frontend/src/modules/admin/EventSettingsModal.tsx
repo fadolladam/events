@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, EventAttachment, EventCategory, EventItem } from '../../services/api';
 import { ImageUploadField } from '../../components/ImageUploadField';
+import { TimezoneSelect } from '../../components/TimezoneSelect';
+import { isoToZonedInput, zonedInputToIso, browserTimeZone, tzOffsetLabel } from '../../utils/tz';
 import { X, Save, CheckCircle2, Plus, Trash2, Image as ImageIcon, Paperclip } from 'lucide-react';
 
 interface EventSettingsModalProps {
@@ -9,23 +11,6 @@ interface EventSettingsModalProps {
   onClose: () => void;
   onSaved: (event: EventItem) => void;
 }
-
-const toLocalInput = (iso?: string) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  const off = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - off).toISOString().slice(0, 16);
-};
-
-/** `<input type="datetime-local">` holds a local wall-clock string with no zone;
- *  convert it back to a UTC ISO string so the API stores the instant the user
- *  actually picked (mirror of `toLocalInput`). */
-const localInputToIso = (v?: string) => {
-  if (!v) return undefined;
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? undefined : d.toISOString();
-};
 
 export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
   eventId,
@@ -50,6 +35,7 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
     capacity: 100,
     waitlist_enabled: true,
     waitlist_capacity: '' as number | '',
+    timezone: browserTimeZone(),
     start_at: '',
     end_at: '',
     venue_name: '',
@@ -73,6 +59,7 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
       .then(([evRes, catRes]) => {
         const e: EventItem = evRes.data;
         setCategories(catRes.data || []);
+        const tz = e.timezone || browserTimeZone();
         setForm({
           title: e.title || '',
           short_title: e.short_title || '',
@@ -84,8 +71,9 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
           capacity: e.capacity ?? 100,
           waitlist_enabled: !!e.waitlist_enabled,
           waitlist_capacity: e.waitlist_capacity ?? '',
-          start_at: toLocalInput(e.start_at),
-          end_at: toLocalInput(e.end_at),
+          timezone: tz,
+          start_at: isoToZonedInput(e.start_at, tz),
+          end_at: isoToZonedInput(e.end_at, tz),
           venue_name: e.venue_name || '',
           address: e.address || '',
           city: e.city || '',
@@ -118,8 +106,9 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
         capacity: Number(form.capacity),
         waitlist_enabled: form.waitlist_enabled,
         waitlist_capacity: form.waitlist_capacity ? Number(form.waitlist_capacity) : undefined,
-        start_at: localInputToIso(form.start_at),
-        end_at: localInputToIso(form.end_at),
+        timezone: form.timezone || undefined,
+        start_at: zonedInputToIso(form.start_at, form.timezone),
+        end_at: zonedInputToIso(form.end_at, form.timezone),
         venue_name: form.venue_name || undefined,
         address: form.address || undefined,
         city: form.city || undefined,
@@ -223,6 +212,15 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
                 </div>
               </div>
 
+              <div>
+                <label className={lbl}>Event Time Zone</label>
+                <TimezoneSelect
+                  value={form.timezone}
+                  onChange={(tz) => set({ timezone: tz })}
+                  className={field + ' bg-white'}
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Start Date &amp; Time</label>
@@ -233,6 +231,10 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
                   <input type="datetime-local" className={field} value={form.end_at} onChange={(e) => set({ end_at: e.target.value })} />
                 </div>
               </div>
+              <p className="-mt-2 text-[11px] text-slate-400">
+                Start and end are entered in the event's time zone
+                {tzOffsetLabel(form.timezone) ? ` — ${form.timezone.replace(/_/g, ' ')}, ${tzOffsetLabel(form.timezone)}` : ''}.
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

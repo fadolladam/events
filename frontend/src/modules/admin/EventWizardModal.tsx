@@ -17,6 +17,15 @@ const toLocalInput = (d: Date): string => {
 
 const nowLocalInput = (): string => toLocalInput(new Date());
 
+/** `datetime-local` values are local wall-clock with no zone; convert to a UTC
+ *  ISO string so the API stores the instant the user picked, not a 0-offset
+ *  reinterpretation of the same digits. */
+const localInputToIso = (v?: string): string | undefined => {
+  if (!v) return undefined;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+};
+
 export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   isOpen,
   onClose,
@@ -171,10 +180,10 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
         event_type: eventType,
         visibility,
         status,
-        start_at: startDate,
-        end_at: endDate,
-        registration_open_at: resolvedRegOpen,
-        registration_close_at: regCloseAt || undefined,
+        start_at: localInputToIso(startDate),
+        end_at: localInputToIso(endDate),
+        registration_open_at: localInputToIso(resolvedRegOpen),
+        registration_close_at: localInputToIso(regCloseAt),
         timezone,
         capacity: Number(capacity),
         waitlist_enabled: waitlistEnabled,

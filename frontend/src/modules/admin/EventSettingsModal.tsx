@@ -18,6 +18,15 @@ const toLocalInput = (iso?: string) => {
   return new Date(d.getTime() - off).toISOString().slice(0, 16);
 };
 
+/** `<input type="datetime-local">` holds a local wall-clock string with no zone;
+ *  convert it back to a UTC ISO string so the API stores the instant the user
+ *  actually picked (mirror of `toLocalInput`). */
+const localInputToIso = (v?: string) => {
+  if (!v) return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+};
+
 export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
   eventId,
   isOpen,
@@ -109,8 +118,8 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
         capacity: Number(form.capacity),
         waitlist_enabled: form.waitlist_enabled,
         waitlist_capacity: form.waitlist_capacity ? Number(form.waitlist_capacity) : undefined,
-        start_at: form.start_at,
-        end_at: form.end_at,
+        start_at: localInputToIso(form.start_at),
+        end_at: localInputToIso(form.end_at),
         venue_name: form.venue_name || undefined,
         address: form.address || undefined,
         city: form.city || undefined,

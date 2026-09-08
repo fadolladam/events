@@ -42,12 +42,12 @@ See [`stack.md`](stack.md) and [`prd.md`](prd.md) for the full specification.
 docker compose up -d --build
 ```
 
-Open **http://localhost:8000** (also published on `:5173`). One app container
-serves the API and the pre-built SPA together.
+Open **http://localhost:5173**. One app container serves the API and the
+pre-built SPA together.
 
 | Service | URL | Notes |
 |---|---|---|
-| `events-backend` | http://localhost:8000 (and `:5173`) | Laravel API **+ the built React SPA** |
+| `events-backend` | http://localhost:5173 | Laravel API **+ the built React SPA** |
 | `events-db` | `localhost:3306` | MySQL 8, persistent volume `events_db_data` |
 
 ```bash

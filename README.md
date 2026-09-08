@@ -26,11 +26,11 @@ A modular event-management platform: a Laravel REST API and a React single-page 
 
 | Layer | Stack |
 |---|---|
-| Backend | PHP 8.4, Laravel 11, Sanctum tokens, MySQL 8 |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, React Router |
+| Backend | PHP 8.3+, Laravel 13, Sanctum tokens, MySQL 8 |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, React Router — built into `backend/public/` and served by Laravel |
 | Tickets / QR | `simplesoftwareio/simple-qrcode` (backend), `qrcode` + `html5-qrcode` (frontend) |
 | Reports | DOMPDF |
-| Delivery | Docker Compose (MySQL + Laravel + Nginx-served SPA) |
+| Delivery | One Laravel app (API + built SPA). Docker Compose, or any PHP 8.3+ / MySQL host (XAMPP). |
 
 See [`stack.md`](stack.md) and [`prd.md`](prd.md) for the full specification.
 
@@ -83,8 +83,70 @@ npm run dev          # http://localhost:5173, proxies /api to :8000
 npm run build        # when done: rebuilds into backend/public/
 ```
 
-For a plain PHP + MySQL / XAMPP host, see
-[`install/INSTALL-XAMPP.md`](install/INSTALL-XAMPP.md).
+---
+
+## Run on XAMPP (plain PHP + MySQL)
+
+The app is one Laravel application — it serves the API **and** the pre-built
+React SPA (committed under `backend/public/`), so **no Node.js is needed to run
+it**. This is the same walkthrough as [`install/INSTALL-XAMPP.md`](install/INSTALL-XAMPP.md).
+
+**1. Prerequisites**
+
+| Tool | Notes |
+|---|---|
+| **XAMPP with PHP 8.3+** | The common XAMPP ships PHP 8.2 — download the **8.3.x** build. Confirm with `php -v` in XAMPP's *Shell*. |
+| **Composer** | Not bundled with XAMPP — <https://getcomposer.org/download/>. |
+
+XAMPP already includes the PHP extensions this app needs (`pdo_mysql`, `gd`,
+`zip`, `mbstring`, `openssl`, `curl`, `bcmath`, `fileinfo`). If `php -m` is
+missing `gd` or `zip`, enable them in `php.ini` and restart Apache.
+
+**2. Get the code and install**
+
+```bash
+git clone https://github.com/fadolladam/events.git
+cd events/backend
+cp .env.xampp .env        # Windows:  copy .env.xampp .env
+composer install
+```
+
+`.env.xampp` is pre-filled for XAMPP's MySQL (`127.0.0.1:3306`, user `root`,
+empty password) and carries a fixed local `APP_KEY` — **there is no
+`php artisan key:generate` step**. Edit `.env` only if your MySQL differs.
+
+**3. Database**
+
+Start **MySQL** in the XAMPP control panel. Open **phpMyAdmin**
+(<http://localhost/phpmyadmin>) → **New** → create a database named **`events`**.
+Then load the schema and demo data, either way:
+
+- `php artisan migrate --seed`
+- or in phpMyAdmin: select the `events` database → **Import** → choose
+  `install/events.sql` → **Go**
+
+**4. Run**
+
+```bash
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+Open **http://localhost:8000**. (`serve.sh` / `serve.bat` in the repo root do
+steps 2 + 4 for you.)
+
+Or serve through **XAMPP's Apache**: add a virtual host whose `DocumentRoot` is
+the **`events/backend/public`** folder, enable `mod_rewrite`, and restart
+Apache. Laravel's `public/.htaccess` handles routing.
+
+**Notes**
+
+- Log in with any seeded account below (password `password123`).
+- **No `php artisan storage:link`** needed — uploaded images are served by a
+  route in the app.
+- **Frontend changes** need a one-off rebuild by someone with Node:
+  `cd frontend && npm ci && npm run build` (outputs into `backend/public/`).
+- **No MySQL at all:** set `DB_CONNECTION=sqlite` in `.env`,
+  `touch database/database.sqlite`, then `php artisan migrate --seed`.
 
 ---
 

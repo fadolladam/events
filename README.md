@@ -42,42 +42,49 @@ See [`stack.md`](stack.md) and [`prd.md`](prd.md) for the full specification.
 docker compose up -d --build
 ```
 
+Open **http://localhost:8000** (also published on `:5173`). One app container
+serves the API and the pre-built SPA together.
+
 | Service | URL | Notes |
 |---|---|---|
-| `events-frontend` | http://localhost:5173 (and `:8080`) | React SPA behind Nginx |
-| `events-backend` | http://localhost:8000 | Laravel API |
+| `events-backend` | http://localhost:8000 (and `:5173`) | Laravel API **+ the built React SPA** |
 | `events-db` | `localhost:3306` | MySQL 8, persistent volume `events_db_data` |
 
 ```bash
 docker compose logs -f          # tail logs
 docker compose down             # stop
-docker compose up -d --build events-frontend   # rebuild just the SPA after a frontend change
 ```
 
-> The frontend image serves a production build — there is no source mount, so a frontend change needs an image rebuild to appear on `:5173`.
+> The SPA is committed pre-built under `backend/public/` and baked into the
+> image. After a **frontend** change, rebuild it and rebuild the container:
+> `cd frontend && npm run build` then `docker compose up -d --build`.
 
 ---
 
 ## Local setup (without Docker)
 
-**Backend**
+**Backend + SPA** (one server — the built SPA lives in `backend/public/`)
 
 ```bash
 cd backend
 composer install
-cp .env.example .env
-php artisan key:generate
+cp .env.example .env             # or: cp .env.xampp .env   (MySQL, no key:generate)
+php artisan key:generate         # skip if you used .env.xampp
 php artisan migrate:fresh --seed
-php artisan serve --port=8000
+php artisan serve --port=8000    # http://localhost:8000 — API + SPA
 ```
 
-**Frontend**
+**Working on the frontend** — Vite dev server with hot reload:
 
 ```bash
 cd frontend
 npm install
 npm run dev          # http://localhost:5173, proxies /api to :8000
+npm run build        # when done: rebuilds into backend/public/
 ```
+
+For a plain PHP + MySQL / XAMPP host, see
+[`install/INSTALL-XAMPP.md`](install/INSTALL-XAMPP.md).
 
 ---
 

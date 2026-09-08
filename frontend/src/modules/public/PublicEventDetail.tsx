@@ -19,6 +19,12 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
   const isFull = (event.confirmed_count || 0) >= event.capacity;
   const isRegistrationOpen = event.dynamic_status === 'registration_open' || (!event.dynamic_status && event.status === 'registration_open');
 
+  const mapHref = event.map_url
+    ? /^https?:\/\//i.test(event.map_url.trim())
+      ? event.map_url.trim()
+      : `https://${event.map_url.trim()}`
+    : null;
+
   const regStatus = ((): { label: string; dot: string } => {
     switch (event.dynamic_status) {
       case 'upcoming':
@@ -170,8 +176,20 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
                   <MapPin className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
                   <div>
                     <div className="font-semibold text-slate-900">Venue / Location</div>
-                    <div>{event.venue_name || 'Online'}</div>
-                    {event.address && <div className="text-slate-500">{event.address}, {event.city}</div>}
+                    <div>{event.venue_name || (event.event_type === 'virtual' ? 'Online' : 'Venue to be announced')}</div>
+                    {event.address && (
+                      <div className="text-slate-500">{[event.address, event.city].filter(Boolean).join(', ')}</div>
+                    )}
+                    {mapHref && (
+                      <a
+                        href={mapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 font-semibold text-indigo-600 hover:underline"
+                      >
+                        <ExternalLink className="w-3 h-3" /> View on map
+                      </a>
+                    )}
                   </div>
                 </div>
 

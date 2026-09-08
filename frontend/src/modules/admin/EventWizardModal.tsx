@@ -61,6 +61,7 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   const [venueName, setVenueName] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
   const [meetingUrl, setMeetingUrl] = useState('');
   const [organizerName, setOrganizerName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -107,6 +108,7 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
     setVenueName('');
     setAddress('');
     setCity('');
+    setMapUrl('');
     setMeetingUrl('');
     setOrganizerName('');
     setContactEmail('');
@@ -193,6 +195,7 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
         venue_name: venueName || undefined,
         address: address || undefined,
         city: city || undefined,
+        map_url: mapUrl.trim() || undefined,
         meeting_url: meetingUrl || undefined,
         organizer_name: organizerName || undefined,
         contact_email: contactEmail || undefined,
@@ -530,6 +533,22 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Location / Map Link
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://maps.app.goo.gl/… or any map link"
+                      value={mapUrl}
+                      onChange={(e) => setMapUrl(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Optional. Paste a Google Maps link — shown as a “View on map” button on the event page.
+                    </p>
                   </div>
                 </>
               )}

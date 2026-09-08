@@ -41,6 +41,7 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
     venue_name: '',
     address: '',
     city: '',
+    map_url: '',
     meeting_url: '',
     organizer_name: '',
     contact_email: '',
@@ -77,6 +78,7 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
           venue_name: e.venue_name || '',
           address: e.address || '',
           city: e.city || '',
+          map_url: e.map_url || '',
           meeting_url: (e as any).meeting_url || '',
           organizer_name: e.organizer_name || '',
           contact_email: e.contact_email || '',
@@ -112,6 +114,7 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
         venue_name: form.venue_name || undefined,
         address: form.address || undefined,
         city: form.city || undefined,
+        map_url: form.map_url.trim() || undefined,
         meeting_url: form.meeting_url || undefined,
         organizer_name: form.organizer_name || undefined,
         contact_email: form.contact_email || undefined,
@@ -245,6 +248,21 @@ export const EventSettingsModal: React.FC<EventSettingsModalProps> = ({
                   <label className={lbl}>City</label>
                   <input className={field} value={form.city} onChange={(e) => set({ city: e.target.value })} />
                 </div>
+              </div>
+
+              <div>
+                <label className={lbl}>Location / Map Link</label>
+                <input
+                  type="url"
+                  className={field}
+                  placeholder="https://maps.app.goo.gl/… or any map link"
+                  value={form.map_url}
+                  onChange={(e) => set({ map_url: e.target.value })}
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Paste a Google Maps (or other) link. Shown as a “View on map” button on the event page —
+                  use this instead of a full address when the venue isn’t the head office.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

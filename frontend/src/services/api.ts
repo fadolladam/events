@@ -180,6 +180,7 @@ export interface EventItem {
   address?: string;
   city?: string;
   country?: string;
+  map_url?: string;
   organizer_name?: string;
   contact_email?: string;
   contact_phone?: string;

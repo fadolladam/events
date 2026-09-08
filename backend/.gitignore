@@ -20,7 +20,8 @@
 /public/storage
 /storage/*.key
 /storage/pail
-/vendor
+# /vendor is committed (production deps, --no-dev) so the app runs without Composer.
+# Refresh it with:  composer install --no-dev --optimize-autoloader
 _ide_helper.php
 Homestead.json
 Homestead.yaml

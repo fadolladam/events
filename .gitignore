@@ -7,8 +7,8 @@ Thumbs.db
 
 # Dependencies & build output (also covered by frontend/ and backend/ .gitignore)
 node_modules/
-vendor/
 dist/
+# backend/vendor/ is intentionally committed so the app runs on a host with no Composer.
 
 # Environment / secrets
 .env

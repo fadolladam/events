@@ -1,5 +1,9 @@
 * text=auto eol=lf
 
+# Committed Composer dependencies: keep bytes exact, no diff noise, and don't
+# let them skew GitHub's language stats.
+vendor/** -text -diff linguist-vendored
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html

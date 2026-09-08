@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { Section, StatTile, ProgressBar, WidgetBoundary } from './dashboard/primitives';
+import { EventQrModal } from './EventQrModal';
 import { TrendChart } from './dashboard/charts';
 import { fmtInt, fmtPct, fmtDate, fmtDateTime, relTime } from './dashboard/format';
 
@@ -39,10 +40,11 @@ const TREND_RANGES: { key: Exclude<DashboardRange, 'today' | 'this_month' | 'thi
   { key: 'all', label: 'All', days: null },
 ];
 
-export const EventOverviewTab: React.FC<Props> = ({ eventId, role, onOpenTab, onEditForm }) => {
+export const EventOverviewTab: React.FC<Props> = ({ eventId, event, role, onOpenTab, onEditForm }) => {
   const canCheckin = hasRole(role, ROLE_TIERS.checkin);
   const canRegistrations = hasRole(role, ROLE_TIERS.registration);
 
+  const [qrOpen, setQrOpen] = useState(false);
   const [data, setData] = useState<EventAnalyticsDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +184,15 @@ export const EventOverviewTab: React.FC<Props> = ({ eventId, role, onOpenTab, on
                   <FileEdit className="w-3.5 h-3.5" /> Edit Form
                 </button>
                 <button
-                  onClick={() => window.open(window.location.origin, '_blank', 'noopener')}
+                  onClick={() => setQrOpen(true)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-[11px] flex items-center gap-1"
+                >
+                  <QrCode className="w-3.5 h-3.5" /> QR Code
+                </button>
+                <button
+                  onClick={() =>
+                    window.open(`${window.location.origin}/events/${event.slug}`, '_blank', 'noopener')
+                  }
                   className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-[11px] flex items-center gap-1"
                 >
                   <ExternalLink className="w-3.5 h-3.5" /> Preview
@@ -361,6 +371,13 @@ export const EventOverviewTab: React.FC<Props> = ({ eventId, role, onOpenTab, on
           </Section>
         </WidgetBoundary>
       </div>
+
+      <EventQrModal
+        isOpen={qrOpen}
+        onClose={() => setQrOpen(false)}
+        slug={event.slug}
+        title={event.title}
+      />
     </div>
   );
 };

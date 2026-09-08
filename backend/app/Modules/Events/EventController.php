@@ -40,7 +40,8 @@ class EventController extends Controller
         }
 
         $perPage = (int) $request->input('per_page', 25);
-        $events = $query->orderBy('start_at', 'desc')->paginate($perPage);
+        // Chronological: the event that happens next sits at the top.
+        $events = $query->orderBy('start_at', 'asc')->orderBy('end_at', 'asc')->paginate($perPage);
 
         // Append counts
         $events->getCollection()->transform(function ($event) {

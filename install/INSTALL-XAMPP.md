@@ -1,51 +1,44 @@
 # Running RHB Events on XAMPP
 
 The app is one Laravel application: the API **and** the pre-built React SPA are
-served from `backend/`. You do **not** need Node.js — the compiled frontend is
-already committed under `backend/public/`.
+served from `backend/`. **No Node.js** (the compiled frontend is committed under
+`backend/public/`) and **no Composer** (the PHP dependencies are committed under
+`backend/vendor/`) — nothing to build.
 
 ---
 
 ## 1. Prerequisites
 
-| Tool | Version | Notes |
-|------|---------|-------|
-| **XAMPP** | with **PHP 8.3+** | The common XAMPP ships PHP 8.2 — download the **8.3.x** build. Check with `php -v`. |
-| **Composer** | 2.x | Not bundled with XAMPP — install from <https://getcomposer.org/download/>. |
-| **Git** | any | To clone the repo. |
+| Tool | Notes |
+|------|-------|
+| **XAMPP** with **PHP 8.3+** | The common XAMPP ships PHP 8.2 — download the **8.3.x** build. Check with `php -v`. |
+| **Git** | To clone the repo (or use GitHub's *Download ZIP*). |
 
 XAMPP already includes the PHP extensions this app needs (`pdo_mysql`, `gd`,
 `zip`, `mbstring`, `openssl`, `curl`, `bcmath`, `fileinfo`). If `php -m` is
 missing `gd` or `zip`, enable them in `php.ini` and restart Apache.
 
+> Composer is **not required** — `backend/vendor/` is committed. Install it only
+> if you want to change or update dependencies:
+> <https://getcomposer.org/download/>.
+
 ---
 
-## 2. Get the code
+## 2. Get the code and configure
 
 ```bash
 git clone https://github.com/fadolladam/events.git
 cd events/backend
-```
-
----
-
-## 3. Configure
-
-```bash
-cp .env.xampp .env
+cp .env.xampp .env        # Windows:  copy .env.xampp .env
 ```
 
 `.env.xampp` is pre-filled for XAMPP defaults (MySQL on `127.0.0.1:3306`,
 user `root`, empty password) and carries a fixed local `APP_KEY`, so there is
 no key-generation step. Edit `.env` if your MySQL differs.
 
-```bash
-composer install
-```
-
 ---
 
-## 4. Database
+## 3. Database
 
 Start **MySQL** in the XAMPP control panel, then create the database — open
 **phpMyAdmin** (<http://localhost/phpmyadmin>) → *New* → name it **`events`**.
@@ -72,7 +65,7 @@ Both give you the same five logins (all password **`password123`**):
 
 ---
 
-## 5. Run it
+## 4. Run it
 
 **Simplest — PHP's built-in server** (use XAMPP only for MySQL):
 

@@ -88,27 +88,28 @@ npm run build        # when done: rebuilds into backend/public/
 ## Run on XAMPP (plain PHP + MySQL)
 
 The app is one Laravel application — it serves the API **and** the pre-built
-React SPA (committed under `backend/public/`), so **no Node.js is needed to run
-it**. This is the same walkthrough as [`install/INSTALL-XAMPP.md`](install/INSTALL-XAMPP.md).
+React SPA. Nothing to build: the compiled frontend is committed under
+`backend/public/` (**no Node.js**) and the PHP dependencies under
+`backend/vendor/` (**no Composer**). Same walkthrough as
+[`install/INSTALL-XAMPP.md`](install/INSTALL-XAMPP.md).
 
 **1. Prerequisites**
 
-| Tool | Notes |
-|---|---|
-| **XAMPP with PHP 8.3+** | The common XAMPP ships PHP 8.2 — download the **8.3.x** build. Confirm with `php -v` in XAMPP's *Shell*. |
-| **Composer** | Not bundled with XAMPP — <https://getcomposer.org/download/>. |
+- **XAMPP with PHP 8.3+** — the common XAMPP ships PHP 8.2, so download the
+  **8.3.x** build; confirm with `php -v` in XAMPP's *Shell*.
+- **Git** — to clone (or use GitHub's *Download ZIP*).
 
 XAMPP already includes the PHP extensions this app needs (`pdo_mysql`, `gd`,
 `zip`, `mbstring`, `openssl`, `curl`, `bcmath`, `fileinfo`). If `php -m` is
-missing `gd` or `zip`, enable them in `php.ini` and restart Apache.
+missing `gd` or `zip`, enable them in `php.ini` and restart Apache. Composer is
+**only** needed if you want to change dependencies.
 
-**2. Get the code and install**
+**2. Get the code and configure**
 
 ```bash
 git clone https://github.com/fadolladam/events.git
 cd events/backend
 cp .env.xampp .env        # Windows:  copy .env.xampp .env
-composer install
 ```
 
 `.env.xampp` is pre-filled for XAMPP's MySQL (`127.0.0.1:3306`, user `root`,

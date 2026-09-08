@@ -25,6 +25,10 @@ $spa = function () {
     return response()->file($index);
 };
 
+// Uploaded event images (GET /storage/{path}) are served by a middleware-free
+// route registered in bootstrap/app.php — works with or without the
+// public/storage symlink and skips session/CSRF cost per image.
+
 Route::get('/', $spa);
 
 Route::fallback(function (Request $request) use ($spa) {

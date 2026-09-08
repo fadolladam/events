@@ -1,134 +1,173 @@
-# Events: Multi-Event Registration, FIFO Waitlist Queue, QR Ticketing & Check-In Platform
+# RHB Events
 
-Events is a modular, production-grade event management platform built according to [prd.md](file:///Users/fadolla-mini/Developer/events/prd.md) and [stack.md](file:///Users/fadolla-mini/Developer/events/stack.md).
+**Multi-event registration, FIFO waitlist queue, QR ticketing & on-site check-in — for internal RHB staff events.**
 
-The codebase is strictly separated into **`backend/`** and **`frontend/`** and designed with a **decoupled, standalone feature module architecture**.
-
----
-
-## Project Structure
-
-```
-events/
-├── backend/                       # Laravel 11+ / PHP 8.x REST API & Service Layer
-│   ├── app/
-│   │   ├── Models/                # Eloquent Models (Event, Registration, Ticket, Checkin, Attendance, etc.)
-│   │   └── Modules/               # Standalone, decoupled domain modules
-│   │       ├── Auth/              # Authentication, Sanctum tokens, RoleMiddleware
-│   │       ├── Events/            # Event CRUD, Status lifecycle, Categories, Templates
-│   │       ├── Forms/             # Dynamic Form Builder & versioning
-│   │       ├── Registration/      # Atomic concurrency-safe registration (SELECT FOR UPDATE)
-│   │       ├── Waitlist/          # Automated FIFO Queue & promotion engine
-│   │       ├── Tickets/           # Cryptographic QR ticket generation (Bacon/SimpleSoftwareIO)
-│   │       ├── CheckIn/           # Mobile QR camera check-in, duplicate detection, undo
-│   │       ├── Attendance/        # Attendee presence & no-show tracking
-│   │       ├── Notifications/     # Notification templates & dispatch logs
-│   │       ├── Reports/           # Analytics, CSV exports & PDF report generation (DOMPDF)
-│   │       └── Audit/             # Immutable audit trail logger
-│   ├── database/
-│   │   ├── migrations/            # Normalized MySQL/MariaDB database tables
-│   │   └── seeders/               # Pre-seeded demo accounts & sample events (BD26, TH26, etc.)
-│   ├── routes/api.php             # Modular REST API endpoints
-│   └── tests/Feature/             # Automated test suite (Capacity, Waitlist, CheckIn)
-│
-├── frontend/                      # Modern React / TypeScript / Tailwind CSS Single Page App
-│   ├── src/
-│   │   ├── modules/
-│   │   │   ├── auth/              # Admin Login & demo account fast-switcher
-│   │   │   ├── public/            # Public Event Catalog, Category Filter, Event Detail
-│   │   │   ├── registration/      # Dynamic Step-by-step Registration Wizard
-│   │   │   ├── participant/       # Self-Service Portal (`/my-registration/{token}`)
-│   │   │   ├── ticket/            # Public QR Ticket Pass (`/ticket/{token}`)
-│   │   │   ├── admin/             # Global Dashboard, Event Management & 4-step Creation Wizard
-│   │   │   ├── forms/             # Visual Dynamic Form Builder Modal
-│   │   │   ├── queue/             # Live Waitlist & FIFO Queue Console
-│   │   │   ├── checkin/           # Mobile-first QR Camera Scanner & Manual Lookup
-│   │   │   ├── attendance/        # Attendance Roster & Status Management
-│   │   │   ├── reports/           # Event Analytics, CSV & PDF Export Triggers
-│   │   │   └── audit/             # Immutable Audit Log Viewer
-│   │   ├── components/            # Layouts and reusable UI primitives
-│   │   └── services/api.ts        # Typed API client and models
-│   └── package.json
-│
-├── prd.md                         # Product Requirements Document
-└── stack.md                       # Technology Stack Specification
-```
+A modular event-management platform: a Laravel REST API and a React single-page app, both fully containerised. Staff browse a public catalogue, register through a dynamic form, receive a QR ticket, and are checked in on-site with a phone camera. Admins run the whole lifecycle — create events, build registration forms, manage a capacity-safe waiting list, and pull analytics.
 
 ---
 
-## Docker Quickstart (`events`)
+## Highlights
 
-You can launch the entire stack (Database, Backend API, and Frontend) in Docker with one command:
+- **Concurrency-safe registration** — capacity is enforced with row-level locks (`SELECT … FOR UPDATE`); no overbooking under load.
+- **Automatic FIFO waitlist** — when a confirmed seat frees up (a cancellation, or capacity increased), the next person in the queue is promoted and issued a ticket automatically. Manual "promote" and per-person priority are available too.
+- **Dynamic form builder** — per-event registration forms (text, select, radio, checkbox, …), reusable form templates, live on the public wizard.
+- **QR tickets & check-in** — cryptographically-tokenised tickets, a mobile QR scanner console with duplicate detection and undo, plus a manual roster.
+- **Timezone-correct scheduling** — every event carries its own IANA time zone; dates are entered and displayed in *that* zone, not the viewer's browser zone.
+- **Per-event QR code** — one click generates a printable QR that deep-links to the public event page.
+- **Location / map link** — paste a Google Maps link instead of a full address for off-site venues.
+- **Admin actions** — cancel a registration (auto-promoting the queue), remove someone from the waitlist, approve/reject pending sign-ups.
+- **Command-centre dashboards** — global and per-event analytics, CSV / PDF exports.
+- **Immutable audit trail** — every state change is logged.
+- **Role-based access** — super admin → event admin → organizer → registration officer → check-in staff → viewer, enforced in route middleware and mirrored in the UI.
+
+---
+
+## Tech stack
+
+| Layer | Stack |
+|---|---|
+| Backend | PHP 8.4, Laravel 11, Sanctum tokens, MySQL 8 |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, React Router |
+| Tickets / QR | `simplesoftwareio/simple-qrcode` (backend), `qrcode` + `html5-qrcode` (frontend) |
+| Reports | DOMPDF |
+| Delivery | Docker Compose (MySQL + Laravel + Nginx-served SPA) |
+
+See [`stack.md`](stack.md) and [`prd.md`](prd.md) for the full specification.
+
+---
+
+## Quick start (Docker)
 
 ```bash
-# Build and start all containers in background
 docker compose up -d --build
 ```
 
-### Containers Created:
-- **`events-frontend`**: Web application served by Nginx on **`http://localhost:5173`** and **`http://localhost:8080`**.
-- **`events-backend`**: Laravel 11 API on **`http://localhost:8000`**.
-- **`events-db`**: MySQL 8.0 database with persistent volume `events_db_data`.
+| Service | URL | Notes |
+|---|---|---|
+| `events-frontend` | http://localhost:5173 (and `:8080`) | React SPA behind Nginx |
+| `events-backend` | http://localhost:8000 | Laravel API |
+| `events-db` | `localhost:3306` | MySQL 8, persistent volume `events_db_data` |
 
-To view logs or stop:
 ```bash
-# View live logs
-docker compose logs -f
-
-# Stop containers
-docker compose down
+docker compose logs -f          # tail logs
+docker compose down             # stop
+docker compose up -d --build events-frontend   # rebuild just the SPA after a frontend change
 ```
+
+> The frontend image serves a production build — there is no source mount, so a frontend change needs an image rebuild to appear on `:5173`.
 
 ---
 
-## Local Manual Setup (Without Docker)
+## Local setup (without Docker)
+
+**Backend**
+
 ```bash
 cd backend
-
-# 1. Install dependencies
 composer install
-
-# 2. Setup environment
 cp .env.example .env
 php artisan key:generate
-
-# 3. Run database migrations & seed demo data
 php artisan migrate:fresh --seed
-
-# 4. Start backend server
 php artisan serve --port=8000
 ```
 
-### 2. Frontend Setup (React + Tailwind)
+**Frontend**
+
 ```bash
 cd frontend
-
-# 1. Install dependencies
 npm install
-
-# 2. Start frontend dev server
-npm run dev
+npm run dev          # http://localhost:5173, proxies /api to :8000
 ```
-
-The frontend will run on **`http://localhost:5173`** and proxy all API calls automatically to **`http://localhost:8000`**.
 
 ---
 
-## Pre-seeded Demo Accounts
+## Seeded logins
+
+`php artisan migrate:fresh --seed` creates these accounts (all `@rhbgroup.com`):
 
 | Role | Email | Password |
 |---|---|---|
-| **Super Admin** | `superadmin@rhbgroup.com` | `password123` |
-| **Event Admin** | `manager@rhbgroup.com` | `password123` |
-| **Check-In Staff** | `staff@rhbgroup.com` | `password123` |
+| Super Admin | `adam.fadhlullah@rhbgroup.com` | `password123` |
+| Event Admin | `manager@rhbgroup.com` | `password123` |
+| Event Organizer | `organizer@rhbgroup.com` | `password123` |
+| Registration Officer | `registration@rhbgroup.com` | `password123` |
+| Check-In Staff | `staff@rhbgroup.com` | `password123` |
+
+> These are development seed credentials for a fresh `migrate:fresh --seed`. Change them before any non-local deployment.
 
 ---
 
-## Running Automated Tests
+## Project layout
 
-Run the full PHPUnit feature test suite covering concurrency safety, waitlist FIFO promotion, permanent numbering, and QR check-in:
+```
+events/
+├── backend/                         Laravel API & service layer
+│   ├── app/
+│   │   ├── Models/                  Eloquent models (Event, Registration, Ticket, Checkin, …)
+│   │   └── Modules/                 Decoupled domain modules
+│   │       ├── Auth/                Sanctum auth + RoleMiddleware
+│   │       ├── Events/              Event CRUD, status lifecycle, categories, templates
+│   │       ├── Forms/               Dynamic form builder & templates
+│   │       ├── Registration/        Concurrency-safe registration
+│   │       ├── Waitlist/            FIFO queue & promotion engine
+│   │       ├── Tickets/             QR ticket generation
+│   │       ├── CheckIn/             QR camera check-in, duplicate detection, undo
+│   │       ├── Attendance/          Presence & no-show tracking
+│   │       ├── Notifications/       Templates & dispatch logs
+│   │       ├── Reports/             Analytics, CSV & PDF exports
+│   │       └── Audit/               Immutable audit logger
+│   ├── database/
+│   │   ├── migrations/
+│   │   ├── seeders/
+│   │   └── backups/                 mysqldump snapshots + restore guide (dumps are git-ignored)
+│   ├── routes/api.php
+│   └── tests/Feature/               Capacity, waitlist, check-in
+│
+├── frontend/                        React / TypeScript / Tailwind SPA
+│   └── src/
+│       ├── modules/
+│       │   ├── auth/                Admin login
+│       │   ├── public/             Catalogue, category filter, event detail
+│       │   ├── registration/       Step-by-step registration wizard
+│       │   ├── participant/        Self-service portal (/my-registration/{token})
+│       │   ├── ticket/             Public QR ticket pass (/ticket/{token})
+│       │   ├── admin/              Global & per-event dashboards, creation wizard
+│       │   ├── forms/              Visual form builder modal
+│       │   ├── queue/              Live waitlist & FIFO queue console
+│       │   ├── checkin/            Mobile QR scanner & manual lookup
+│       │   ├── attendance/         Attendance roster
+│       │   ├── reports/            Analytics, CSV / PDF triggers
+│       │   └── audit/             Audit log viewer
+│       ├── components/             Layouts & reusable UI primitives
+│       └── services/api.ts         Typed API client & models
+│
+├── docker-compose.yml
+├── prd.md                           Product requirements
+└── stack.md                        Technology stack
+```
+
+---
+
+## Tests
 
 ```bash
 cd backend
 php artisan test
+```
+
+Feature suite covers concurrency safety, waitlist FIFO promotion, permanent registration numbering, and QR check-in.
+
+---
+
+## Database backups
+
+Full `mysqldump` snapshots and the exact dump/restore commands live in
+[`backend/database/backups/`](backend/database/backups/). The `.sql` files
+themselves are git-ignored — take a fresh one with:
+
+```bash
+docker compose exec -T events-db mysqldump -u root -proot_secret \
+  --databases events --single-transaction --routines --triggers --events \
+  --no-tablespaces --add-drop-database --column-statistics=0 \
+  > backend/database/backups/events_backup_$(date +%Y%m%d_%H%M%S).sql
 ```

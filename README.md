@@ -2,7 +2,11 @@
 
 **Multi-event registration, FIFO waitlist queue, QR ticketing & on-site check-in — for internal RHB staff events.**
 
-A modular event-management platform: a Laravel REST API and a React single-page app, both fully containerised. Staff browse a public catalogue, register through a dynamic form, receive a QR ticket, and are checked in on-site with a phone camera. Admins run the whole lifecycle — create events, build registration forms, manage a capacity-safe waiting list, and pull analytics.
+One Laravel application. It serves a JSON API **and** a compiled React single-page
+app from the same origin. Staff browse a public catalogue, register through a
+dynamic form, get a QR ticket, and are checked in on-site with a phone camera.
+Admins run the whole lifecycle — create events, build registration forms, manage
+a capacity-safe waiting list, and pull analytics.
 
 ---
 
@@ -27,23 +31,27 @@ A modular event-management platform: a Laravel REST API and a React single-page 
 | Layer | Stack |
 |---|---|
 | Backend | PHP 8.3+, Laravel 13, Sanctum tokens, MySQL 8 |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, React Router — built into `backend/public/` and served by Laravel |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, React Router |
 | Tickets / QR | `simplesoftwareio/simple-qrcode` (backend), `qrcode` + `html5-qrcode` (frontend) |
 | Reports | DOMPDF |
-| Delivery | One Laravel app (API + built SPA). Docker Compose, or any PHP 8.3+ / MySQL host (XAMPP). |
+| Delivery | One Laravel app (API + built SPA). Docker Compose, or any PHP 8.3+ / MySQL host. |
 
-See [`stack.md`](stack.md) and [`prd.md`](prd.md) for the full specification.
+The compiled frontend (`backend/public/`) and the PHP dependencies
+(`backend/vendor/`) are **committed**, so the app runs from a bare clone with
+**no Node.js and no Composer**. See [`stack.md`](stack.md) and [`prd.md`](prd.md)
+for the full specification.
 
 ---
 
-## Quick start (Docker)
+## Run it
+
+### Option A — Docker (fastest)
 
 ```bash
 docker compose up -d --build
 ```
 
-Open **http://localhost:5173**. One app container serves the API and the
-pre-built SPA together.
+Open **http://localhost:5173**.
 
 | Service | URL | Notes |
 |---|---|---|
@@ -51,119 +59,80 @@ pre-built SPA together.
 | `events-db` | `localhost:3306` | MySQL 8, persistent volume `events_db_data` |
 
 ```bash
-docker compose logs -f          # tail logs
-docker compose down             # stop
+docker compose logs -f     # tail logs
+docker compose down         # stop
 ```
 
-> The SPA is committed pre-built under `backend/public/` and baked into the
-> image. After a **frontend** change, rebuild it and rebuild the container:
-> `cd frontend && npm run build` then `docker compose up -d --build`.
+> After a **frontend** change: `cd frontend && npm run build` (outputs into
+> `backend/public/`), then `docker compose up -d --build`.
 
----
+### Option B — XAMPP / any plain PHP + MySQL host
 
-## Local setup (without Docker)
+Full walkthrough: [`install/INSTALL-XAMPP.md`](install/INSTALL-XAMPP.md).
 
-**Backend + SPA** (one server — the built SPA lives in `backend/public/`)
+1. **XAMPP with PHP 8.3+** (the common build ships 8.2 — get the 8.3.x one) and
+   Git. Nothing else — no Node, no Composer.
+2. Get the code and configure:
+   ```bash
+   git clone https://github.com/fadolladam/events.git
+   cd events/backend
+   cp .env.xampp .env        # Windows: copy .env.xampp .env
+   ```
+   `.env.xampp` is pre-filled for XAMPP's MySQL (`127.0.0.1:3306`, `root`, no
+   password) and carries a fixed `APP_KEY` — no `key:generate` step.
+3. In **phpMyAdmin** create a database named **`events`**, then load it:
+   - **Import** `install/events.sql` (the 3 demo events + registrations), **or**
+   - `php artisan migrate --seed` (schema + generic seed data)
+4. Run — either:
+   - `php artisan serve` → **http://localhost:8000**, or
+   - point an Apache **vhost** `DocumentRoot` at `events/backend/public`
+     (`mod_rewrite` on).
+
+   (`serve.sh` / `serve.bat` in the repo root do steps 2 + 4.)
+
+Notes: no `php artisan storage:link` needed (images are served by a route). For
+no MySQL at all, set `DB_CONNECTION=sqlite`, `touch database/database.sqlite`,
+then `php artisan migrate --seed`.
+
+### Option C — Develop locally
 
 ```bash
 cd backend
-composer install
-cp .env.example .env             # or: cp .env.xampp .env   (MySQL, no key:generate)
-php artisan key:generate         # skip if you used .env.xampp
+composer install                 # dev tools: phpunit, pint, …
+cp .env.example .env
+php artisan key:generate
 php artisan migrate:fresh --seed
-php artisan serve --port=8000    # http://localhost:8000 — API + SPA
+php artisan serve --port=8000    # API + SPA at http://localhost:8000
 ```
 
-**Working on the frontend** — Vite dev server with hot reload:
+Frontend with hot reload (separate terminal):
 
 ```bash
 cd frontend
 npm install
-npm run dev          # http://localhost:5173, proxies /api to :8000
-npm run build        # when done: rebuilds into backend/public/
+npm run dev      # http://localhost:5173, proxies /api to :8000
+npm run build    # when done — rebuilds into backend/public/
 ```
 
 ---
 
-## Run on XAMPP (plain PHP + MySQL)
+## Logins
 
-The app is one Laravel application — it serves the API **and** the pre-built
-React SPA. Nothing to build: the compiled frontend is committed under
-`backend/public/` (**no Node.js**) and the PHP dependencies under
-`backend/vendor/` (**no Composer**). Same walkthrough as
-[`install/INSTALL-XAMPP.md`](install/INSTALL-XAMPP.md).
+Both `install/events.sql` and `php artisan migrate --seed` create the same five
+accounts (all `@rhbgroup.com`, password **`password123`**):
 
-**1. Prerequisites**
+| Role | Email |
+|---|---|
+| Super Admin | `adam.fadhlullah@rhbgroup.com` |
+| Event Admin | `manager@rhbgroup.com` |
+| Event Organizer | `organizer@rhbgroup.com` |
+| Registration Officer | `registration@rhbgroup.com` |
+| Check-In Staff | `staff@rhbgroup.com` |
 
-- **XAMPP with PHP 8.3+** — the common XAMPP ships PHP 8.2, so download the
-  **8.3.x** build; confirm with `php -v` in XAMPP's *Shell*.
-- **Git** — to clone (or use GitHub's *Download ZIP*).
-
-XAMPP already includes the PHP extensions this app needs (`pdo_mysql`, `gd`,
-`zip`, `mbstring`, `openssl`, `curl`, `bcmath`, `fileinfo`). If `php -m` is
-missing `gd` or `zip`, enable them in `php.ini` and restart Apache. Composer is
-**only** needed if you want to change dependencies.
-
-**2. Get the code and configure**
-
-```bash
-git clone https://github.com/fadolladam/events.git
-cd events/backend
-cp .env.xampp .env        # Windows:  copy .env.xampp .env
-```
-
-`.env.xampp` is pre-filled for XAMPP's MySQL (`127.0.0.1:3306`, user `root`,
-empty password) and carries a fixed local `APP_KEY` — **there is no
-`php artisan key:generate` step**. Edit `.env` only if your MySQL differs.
-
-**3. Database**
-
-Start **MySQL** in the XAMPP control panel. Open **phpMyAdmin**
-(<http://localhost/phpmyadmin>) → **New** → create a database named **`events`**.
-Then load the schema and demo data, either way:
-
-- `php artisan migrate --seed`
-- or in phpMyAdmin: select the `events` database → **Import** → choose
-  `install/events.sql` → **Go**
-
-**4. Run**
-
-```bash
-php artisan serve --host=127.0.0.1 --port=8000
-```
-
-Open **http://localhost:8000**. (`serve.sh` / `serve.bat` in the repo root do
-steps 2 + 4 for you.)
-
-Or serve through **XAMPP's Apache**: add a virtual host whose `DocumentRoot` is
-the **`events/backend/public`** folder, enable `mod_rewrite`, and restart
-Apache. Laravel's `public/.htaccess` handles routing.
-
-**Notes**
-
-- Log in with any seeded account below (password `password123`).
-- **No `php artisan storage:link`** needed — uploaded images are served by a
-  route in the app.
-- **Frontend changes** need a one-off rebuild by someone with Node:
-  `cd frontend && npm ci && npm run build` (outputs into `backend/public/`).
-- **No MySQL at all:** set `DB_CONNECTION=sqlite` in `.env`,
-  `touch database/database.sqlite`, then `php artisan migrate --seed`.
-
----
-
-## Seeded logins
-
-`php artisan migrate:fresh --seed` creates these accounts (all `@rhbgroup.com`):
-
-| Role | Email | Password |
-|---|---|---|
-| Super Admin | `adam.fadhlullah@rhbgroup.com` | `password123` |
-| Event Admin | `manager@rhbgroup.com` | `password123` |
-| Event Organizer | `organizer@rhbgroup.com` | `password123` |
-| Registration Officer | `registration@rhbgroup.com` | `password123` |
-| Check-In Staff | `staff@rhbgroup.com` | `password123` |
-
-> These are development seed credentials for a fresh `migrate:fresh --seed`. Change them before any non-local deployment.
+`install/events.sql` also carries the three demo events (Badminton, Blood
+Donation, Angkor Wat marathon) with their registrations; `migrate --seed`
+generates its own generic demo data instead. Change the passwords before any
+non-local deployment.
 
 ---
 
@@ -171,7 +140,7 @@ Apache. Laravel's `public/.htaccess` handles routing.
 
 ```
 events/
-├── backend/                         Laravel API & service layer
+├── backend/                         Laravel app — API + the built SPA (public/)
 │   ├── app/
 │   │   ├── Models/                  Eloquent models (Event, Registration, Ticket, Checkin, …)
 │   │   └── Modules/                 Decoupled domain modules
@@ -186,34 +155,20 @@ events/
 │   │       ├── Notifications/       Templates & dispatch logs
 │   │       ├── Reports/             Analytics, CSV & PDF exports
 │   │       └── Audit/               Immutable audit logger
-│   ├── database/
-│   │   ├── migrations/
-│   │   ├── seeders/
-│   │   └── backups/                 mysqldump snapshots + restore guide (dumps are git-ignored)
-│   ├── routes/api.php
-│   └── tests/Feature/               Capacity, waitlist, check-in
+│   ├── database/{migrations,seeders,backups}
+│   ├── public/                      Laravel front controller + the built SPA (committed)
+│   ├── vendor/                      Composer deps (committed, --no-dev)
+│   └── routes/api.php · tests/Feature/
 │
-├── frontend/                        React / TypeScript / Tailwind SPA
-│   └── src/
-│       ├── modules/
-│       │   ├── auth/                Admin login
-│       │   ├── public/             Catalogue, category filter, event detail
-│       │   ├── registration/       Step-by-step registration wizard
-│       │   ├── participant/        Self-service portal (/my-registration/{token})
-│       │   ├── ticket/             Public QR ticket pass (/ticket/{token})
-│       │   ├── admin/              Global & per-event dashboards, creation wizard
-│       │   ├── forms/              Visual form builder modal
-│       │   ├── queue/              Live waitlist & FIFO queue console
-│       │   ├── checkin/            Mobile QR scanner & manual lookup
-│       │   ├── attendance/         Attendance roster
-│       │   ├── reports/            Analytics, CSV / PDF triggers
-│       │   └── audit/             Audit log viewer
-│       ├── components/             Layouts & reusable UI primitives
-│       └── services/api.ts         Typed API client & models
+├── frontend/                        React / TypeScript / Tailwind SPA (source)
+│   └── src/modules/                 auth · public · registration · participant ·
+│                                    ticket · admin · forms · queue · checkin ·
+│                                    attendance · reports · audit
 │
+├── install/                         .env.xampp · events.sql · INSTALL-XAMPP.md
+├── serve.sh · serve.bat             one-command local start
 ├── docker-compose.yml
-├── prd.md                           Product requirements
-└── stack.md                        Technology stack
+└── prd.md · stack.md                product + tech spec
 ```
 
 ---
@@ -222,18 +177,20 @@ events/
 
 ```bash
 cd backend
+composer install      # if you cloned the --no-dev vendor
 php artisan test
 ```
 
-Feature suite covers concurrency safety, waitlist FIFO promotion, permanent registration numbering, and QR check-in.
+Covers concurrency safety, waitlist FIFO promotion, permanent registration
+numbering, and QR check-in.
 
 ---
 
 ## Database backups
 
-Full `mysqldump` snapshots and the exact dump/restore commands live in
-[`backend/database/backups/`](backend/database/backups/). The `.sql` files
-themselves are git-ignored — take a fresh one with:
+`mysqldump` snapshots and dump/restore commands live in
+[`backend/database/backups/`](backend/database/backups/) (the `.sql` files are
+git-ignored). Quick dump from the Docker stack:
 
 ```bash
 docker compose exec -T events-db mysqldump -u root -proot_secret \

@@ -52,6 +52,11 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #25 Form-builder UX | ✅ drag/drop reorder, live preview, duplicate-key guard (client + `distinct:ignore_case`). `FormBuilderGuardTest`. |
 | 2026-09-09 | #26 Event templates | ✅ 8-template `EventTemplateSeeder`; `GET /templates/{id}` + `POST /events/{id}/save-as-template`; wizard picker + "Save as template". `EventTemplateTest`. |
 | 2026-09-09 | #27 Wizard | ◐ per-step validation + localStorage draft autosave + staff-assignment step; `EventStaffController` (GET/PUT `/events/{id}/staff`) + `GET /users/assignable`. `EventStaffTest`. **Tier 2 complete.** Suite: 81. |
+| 2026-09-09 | #32 + #37 Team/Audit tabs | ✅ per-event Team + Audit tabs, `GET /events/{id}/audit-logs`, header strip. `EventAuditTabTest`. |
+| 2026-09-09 | #31 Global search | ✅ `GET /search` grouped + permission-filtered; `GlobalSearch` in the shell. `GlobalSearchTest`. |
+| 2026-09-09 | #34 + #35 Reports/export | ◐ `RegistrationFilters` shared; CSV gains answer columns + tz + filter-respect + audited filters; `departments` + `answer_summary` in `eventStats`. `ReportExportTest`. OPEN: PDF parity, dedicated waitlist/checkin report views. |
+| 2026-09-09 | #36 User management | ✅ `PATCH /users/{id}` + `/admin/users` page (list/edit/create/force-reset/last-login). `UserManagementTest`. |
+| 2026-09-09 | #33/#41/#42 | ✅ per-event readiness checklist on Overview; `/admin/calendar` month view; OpenStreetMap embed on the public event page. **Tier 3: 7 done / 3 partial; only #38, #39 open.** Suite: 94. |
 
 ---
 
@@ -62,8 +67,8 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
 | **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
 | **2 Core** | #19–#27, #29, #30 | #18(timeline), #23(file), #27(10-step), #28(dyn-status) | — **TIER COMPLETE** |
-| 3 Admin/Dash | #27-adjacent | #42, #43 | #31–#41 (#40 ❌) |
-| 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
+| **3 Admin/Dash** | #31, #32, #33, #36, #37, #41, #42 | #34, #35, #43 | #38, #39 · #40 ❌ |
+| 4 Production | #37(CI), #51 | #44, #46, #52, #55 | #38, #39, #45, #47–#50, #53, #54 |
 | 5 Housekeeping | #56 | — | #57, #58 |
 
 ---
@@ -267,32 +272,38 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 
 ## TIER 3 — Admin, dashboard & reporting
 
-- ☐ **31. Global admin search** — events / registration number / participant /
-  employee ID / email / phone; grouped results; permission-filtered (never show
-  unauthorized results). None today (only per-event check-in search). _PRD
-  (deferred) · E§30_
-- ☐ **32. Event command-centre tabs** — add a per-event **Staff** tab and a
-  per-event **Audit** tab; event header with status/date/venue/capacity/
-  registrations/waitlist/check-ins. _E§28_
-- ☐ **33. Event Readiness checklist** — surface the existing
-  `DashboardService::readiness()` as a per-event checklist with % and no
-  misleading "ready" when critical config is missing. _E§29_
-- ☐ **34. Reports expansion** — department breakdown, no-show, form-answers,
-  dedicated waitlist / check-in report views (have: status, capacity util,
-  by-date, source). _PRD §48 · E§31_
-- ☐ **35. Export correctness** — CSV/PDF must respect the table filters + the
-  caller's permissions, use event timezone, consistent column naming, include
-  **dynamic answers**, protect sensitive fields, stream large sets, and be
-  **audited**. Today: streamed but unfiltered, no answers, not audited. _PRD §48
-  · E§32_
-- ☐ **36. User management UI + endpoints** — create / edit / activate / disable /
-  assign global role / assign+remove event role / force password reset /
-  last-login / status. Prevent escalation (event_admin ≠ create super_admin —
-  already guarded on create). Add a `last_login` column. No frontend today.
-  _E§33_
-- ☐ **37. Event staff assignment screen** — assign owner / manager / organizer /
-  registration officer / check-in staff / viewer per event; enforce in backend
-  authz (ties to item 9). No endpoints/UI today. _PRD §39 · E§34_
+- ✅ **31. Global admin search** — `GET /search?q=` (SearchController, staff
+  tier) → grouped {events, registrations, participants}, permission-filtered
+  (org-wide vs assigned events only). `GlobalSearch` in the admin shell header.
+  `GlobalSearchTest`. _E§30_
+- ✅ **32. Event command-centre tabs** — per-event **Team** tab + **Audit** tab
+  (`GET /events/{id}/audit-logs`, event-scoped) added to `EVENT_TABS`; compact
+  header strip (date/venue/capacity/waitlist/checked-in) on every tab.
+  `EventAuditTabTest`. _E§28_
+- ✅ **33. Event Readiness checklist** — `GET /events/{id}` returns a 10-item
+  `readiness` checklist (details / schedule / reg window / form / capacity /
+  venue / team / check-in staff / branding / published) with %, each item
+  honest; rendered at the top of the Overview tab. _E§29_
+- ◐ **34. Reports expansion** — DONE: `departments` breakdown + `answer_summary`
+  (per-option counts for every choice field) added to `eventStats`, rendered in
+  `EventReportsPage`; no-show already shown. `ReportExportTest`. OPEN: dedicated
+  waitlist / check-in report *views*. _PRD §48 · E§31_
+- ◐ **35. Export correctness** — DONE: shared `RegistrationFilters`, CSV now
+  honours the console filters, has a column per form field (+ employee_id /
+  department), dates in the event timezone (tz in the header), and the audit
+  entry records the filters. UI "Export CSV" button on the Registrations tab.
+  `ReportExportTest`. OPEN: same treatment for the PDF; large-set streaming
+  review. _PRD §48 · E§32_
+- ✅ **36. User management** — `PATCH /users/{id}` (name/phone/role/status, no
+  escalation, no self-lockout, deactivate drops tokens, audited) alongside the
+  existing create + force-reset + `last_login_at`. `/admin/users` page:
+  list/filter/search, create + edit drawers, force-reset, last-login column.
+  `UserManagementTest`. (Per-event roles live on the #37 Team tab.) _E§33_
+- ✅ **37. Event staff assignment screen** — `EventStaffController`
+  (GET/PUT `/events/{id}/staff`, full-team sync, audited, participants ignored)
+  + `GET /users/assignable`; the **Team** tab on the event console. Assigning
+  someone grants event-scope access immediately (ties to #9). `EventStaffTest`.
+  _PRD §39 · E§34_
 - ☐ **38. Organization settings UI** — name, logo, timezone, contact, branding.
   _PRD §76_
 - ☐ **39. Multi-organization scoping** — actually scope queries by
@@ -300,8 +311,9 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 - ❌ **40. Notification template editor UI** — **OUT OF SCOPE** (depends on the
   retired notification engine). _PRD §75/§35_
 - ☐ **41. Calendar view** — month/week calendar of events. _PRD §41_
-- ◐ **42. Location map** — `map_url` now renders as a link; add embedded map /
-  use `latitude`/`longitude`. _PRD §40_
+- ✅ **42. Location map** — `PublicEventDetail` embeds an OpenStreetMap iframe
+  from the event's lat/lng (plus the existing link); CSP `frame-src` allows
+  only openstreetmap.org. _PRD §40_
 - ◐ **43. Admin UX polish** — replace remaining `alert()` / `confirm()` (~10
   modules) with the existing `ConfirmDialog`; add breadcrumbs, empty/loading
   states, validation feedback, keyboard nav, a11y. _PRD §33 · E§35_

@@ -28,6 +28,20 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #17 Expand audit trail | ◐ added: `user_login_failed`, `event_deleted` (hard delete), `report_exported` (csv/pdf). Still open: user updated/role/disabled (need #36 endpoints), manual-registration (needs #2), attendance changes. |
 | 2026-09-09 | #28 Event lifecycle guards | ✅ `EventService` now enforces a status-transition map on both `changeStatus()` and the generic `updateEvent()` payload; invalid moves → 422. Tests added. |
 | 2026-09-09 | #56 Seed all 5 roles | ✅ `DatabaseSeeder` now creates event_organizer + registration_officer (was 3 accounts) and wires them into `event_staff`; README claim is now accurate. |
+| 2026-09-09 | #2 Admin manual registration | ✅ `POST /events/{id}/registrations` (registration-officer tier) → same `RegistrationService::register()` (source=`manual`); `ManualRegistrationModal` + "Add participant" button on the Registrations tab; `registration_manual_created` audit; `ManualRegistrationTest`. **Tier 0 complete.** |
+
+---
+
+## Tier status
+
+| Tier | Done | Partial | Open / N-A |
+|---|---|---|---|
+| **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
+| 1 Security | #13 | #6, #17 | #4, #5, #7, #8, #9, #10, #11, #12, #14, #15, #16 |
+| 2 Core | #23, #27 | #28 | #18–#22, #24, #25, #26, #29, #30 |
+| 3 Admin/Dash | #27 | #42, #43 | #31–#41 (#40 ❌) |
+| 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
+| 5 Housekeeping | #56 | — | #57, #58 |
 
 ---
 
@@ -36,11 +50,16 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 - ❌ **1. Email notification engine** — **OUT OF SCOPE.** Will not be built.
   `NotificationService` stays dormant; no `Mail`, no scheduler. (Retired per
   owner decision; kept as a numbered placeholder so later references don't shift.)
-- ☐ **2. Admin manual registration** — new authorized endpoint + UI:
-  select event → search/create participant → render the *same* dynamic form →
-  submit through the **existing `RegistrationService`** (no second engine), so
-  capacity / duplicate / approval / waitlist / sequence / ticket / history /
-  audit all still apply. _PRD §38 · E§16_
+- ✅ **2. Admin manual registration** — `POST /events/{id}/registrations`
+  (registration-officer tier, throttle 60/min) → `RegistrationController::
+  storeManual()` → the existing `RegistrationService::register(source:'manual')`,
+  so capacity / duplicate / approval / waitlist / sequence / permanent number /
+  QR ticket / status history all behave identically. `ManualRegistrationModal`
+  renders identity fields + the event's dynamic form; "Add participant" button
+  on the Registrations tab; `registration_manual_created` audit entry.
+  `ManualRegistrationTest` (4 cases). FOLLOW-UPS: participant autocomplete
+  (#19), and an optional "register despite registration_closed" override.
+  _PRD §38 · E§16_
 - ✅ **3. Make tests runnable + CI** — `routes/api.php` role-tier `const`s were
   fataling on the test runner's 2nd app boot → converted to guarded `define()`.
   Added `.github/workflows/ci.yml`: backend job = `composer install` (with dev) +

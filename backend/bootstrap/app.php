@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RequestContext;
 use App\Http\Middleware\SecurityHeaders;
 use App\Modules\Auth\EventScopeMiddleware;
 use App\Modules\Auth\RoleMiddleware;
@@ -52,6 +53,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'event.scope' => EventScopeMiddleware::class,
         ]);
+
+        // Request id + slow-request logging (outermost, so it wraps everything).
+        $middleware->prepend(RequestContext::class);
 
         // Security headers on every response (SPA HTML, API JSON, /storage).
         $middleware->append(SecurityHeaders::class);

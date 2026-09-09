@@ -18,6 +18,7 @@ use App\Modules\Registration\ParticipantController;
 use App\Modules\Registration\RegistrationController;
 use App\Modules\Reports\ReportController;
 use App\Modules\Search\SearchController;
+use App\Modules\System\HealthController;
 use App\Modules\Tickets\TicketController;
 use App\Modules\Waitlist\WaitlistController;
 use Illuminate\Support\Facades\Route;
@@ -180,6 +181,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/events/{id}', [EventController::class, 'destroy']);
 
         Route::get('/audit-logs', [AuditController::class, 'index']);
+        Route::get('/health', HealthController::class);
 
         Route::get('/organization', [OrganizationController::class, 'show']);
         Route::put('/organization', [OrganizationController::class, 'update']);

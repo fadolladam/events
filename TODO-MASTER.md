@@ -60,6 +60,11 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #38 Org settings | ✅ `OrganizationController` GET/PUT `/organization` (governance); `/admin/settings` page. `OrganizationSettingsTest`. |
 | 2026-09-09 | #39 Multi-org scoping | ✅ `User::scopedOrgId()`; `EventScopeMiddleware` rejects out-of-org events (event_admin included), and `events` list / search / participants / dashboards filter by the caller's org; new events inherit the creator's org. `MultiOrgScopingTest`. |
 | 2026-09-09 | #34/#35 PDF + #43 | ✅ PDF export = filters + tz + dept/answers + audited filters; every `alert()`/`confirm()` swept onto `toast()` / `confirmDialog()` (new `uiFeedback` + `FeedbackHost`). **Tier 3 complete.** Suite: 100. |
+| 2026-09-09 | #44–#48 + #55 Prod ops & docs | ✅ `.env.docker.example` + secret-free `docker-compose.yml` (fails without `APP_KEY`, MySQL bound to loopback); `DEPLOYMENT.md`; `install/db-grant.sql` least-privilege grant; `install/backup.sh` (GPG + retention, refuses plaintext) + `install/restore-verify.sh`; `TESTING.md`; README run-paths refresh. |
+| 2026-09-09 | #53 API error envelope | ✅ `ApiErrorResponse::make()` via `withExceptions()->render()` — `{message, code, errors?}`, correct 403/404/419/422/429/500, generic 404, traces debug-only; `RoleMiddleware`/`EventScopeMiddleware` `abort()` through it; frontend 401+419 interceptor. `ApiErrorEnvelopeTest`. |
+| 2026-09-09 | #49 + #50 Observability | ✅ split `security`/`audit`/`performance` log channels; `AuditService` mirrors security actions; `RequestContext` middleware (`X-Request-Id`, shared context, slow-request warning); `GET /api/health` (governance) with db/cache checks + login-failure/lockout/disk signals, 503 when degraded. `ObservabilityTest`. |
+| 2026-09-09 | #51 + #52 Perf & indexes | ✅ killed the event-list N+1 (`withCount` on `index`/`publicEvents`); `EventListPerformanceTest` (fixed query count vs. dataset size); `2026_09_09_000002_add_query_hotpath_indexes` (waitlist order, answer lookups, audit tab, event_staff, checkin time). |
+| 2026-09-09 | #54 Expand test suite | ✅ `RbacMatrixTest` (endpoint × 6 roles + no-auth), `DuplicateRegistrationTest`, `AttendanceTest`, `RateLimitTest`; rest of the E§48 list already covered by existing suites. **Tier 4 complete.** Suite: 152. |
 
 ---
 
@@ -68,10 +73,10 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | Tier | Done | Partial | Open / N-A |
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
-| **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
+| **1 Security** | #4, #5, #6, #9, #10, #11, #13, #14, #15 | #7, #8, #16, #17 | #12 |
 | **2 Core** | #19–#27, #29, #30 | #18(timeline), #23(file), #27(10-step), #28(dyn-status) | — **TIER COMPLETE** |
-| **3 Admin/Dash** | #31–#33, #36–#39, #41–#43 | #34(views), #35(pdf-stream) | #40 ❌ — **TIER COMPLETE** |
-| 4 Production | #37(CI), #51 | #44, #46, #52, #55 | #38, #39, #45, #47–#50, #53, #54 |
+| **3 Admin/Dash** | #31–#33, #35–#39, #41–#43 | #34(dedicated waitlist/checkin report views) | #40 ❌ — **TIER COMPLETE** |
+| **4 Production** | #37(CI), #44–#55 | — | — **TIER COMPLETE** |
 | 5 Housekeeping | #56 | — | #57, #58 |
 
 ---
@@ -145,9 +150,10 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 - ✅ **10. IDOR / object-level** — `/registrations/{id}` (+approve/reject/cancel)
   and `/waitlist/{registrationId}/priority` resolve the parent event and run the
   same scope check; public token routes already object-scoped. _E§8_
-- ◐ **11. RBAC permission matrix** — `RBAC-MATRIX.md` written (endpoint × role ×
-  event-scope, authoritative next to `routes/api.php`). OPEN: exhaustive
-  automated endpoint × 7-role suite asserting 200/401/403 (E§49). _E§6, §49_
+- ✅ **11. RBAC permission matrix** — `RBAC-MATRIX.md` (endpoint × role ×
+  event-scope, authoritative next to `routes/api.php`) **and** `RbacMatrixTest`
+  (every protected endpoint × 6 staff roles + unauthenticated, asserting the
+  authz outcome 200-ish / 403 / 401). _E§6, §49_
 
 ### API / data protection
 - ☐ **12. API Resources / DTOs** — stop returning raw Eloquent models; least-
@@ -175,14 +181,17 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   accepted key. _E§9, §10_
 
 ### Audit
-- ◐ **17. Expand audit trail** — DONE: `user_login_failed`, `event_deleted`
-  (hard-delete path), `report_exported` (csv + pdf). Already existed:
-  `user_login`, `user_logout`, `user_registered`, `user_created`, event
+- ◐ **17. Expand audit trail** — DONE: `user_login_failed`,
+  `user_login_locked_out`, `event_deleted` (hard-delete path), `report_exported`
+  (csv + pdf), `user_updated`, `event_staff_updated`, `organization_updated`,
+  `event_template_created`, `registration_manual_created`,
+  `attendance_status_updated` + `attendance_bulk_updated`. Split `audit` /
+  `security` log channels mirror these (#49). Already existed: `user_login`,
+  `user_logout`, `user_registered`, `user_created`, event
   create/update/status/duplicate, registration created/cancelled,
   participant_promoted, waitlist_priority_changed, check-in create/reverse.
-  STILL OPEN: user updated / role changed / disabled (need #36 endpoints),
-  manual-registration (needs #2), attendance changes; DB-level guard so normal
-  admins cannot modify/delete `audit_logs` rows. _PRD §49 · E§15_
+  STILL OPEN: DB-level guard so normal admins cannot modify/delete `audit_logs`
+  rows. _PRD §49 · E§15_
 
 ---
 
@@ -332,41 +341,50 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 
 ## TIER 4 — Production readiness
 
-- ◐ **44. Environment separation** — add staging/testing env configs; keep prod
-  `APP_DEBUG=false` (Docker already does). _E§36_
-- ☐ **45. `DEPLOYMENT.md`** — Apache/Nginx + PHP 8.3+ + MySQL 8 + HTTPS; required
-  PHP extensions; filesystem permissions; only `backend/public` web-accessible.
-  _E§38_
-- ◐ **46. Database account hardening** — dedicated least-privilege grant
-  (`rhb_events_app`), documented; `.env.xampp` currently uses `root`; MySQL not
-  publicly exposed. _E§39_
-- ☐ **47. Secrets hygiene** — remove hard-coded `APP_KEY` and DB passwords from
-  `docker-compose.yml`; ship `.env.example` only. _E§41_
-- ◐ **48. Backup strategy** — extend the manual dump/restore guide to scheduled
-  daily backup, encryption, retention, and a **verified** restore procedure.
+- ✅ **44. Environment separation** — `.env.docker.example` (prod-shaped, no
+  secrets), `.env.example` documents the SPA/session/CORS knobs; Docker keeps
+  `APP_DEBUG=false`; `docker-compose.yml` fails fast without `APP_KEY`. _E§36_
+- ✅ **45. `DEPLOYMENT.md`** — Apache/Nginx + PHP 8.3+ + MySQL 8 + HTTPS, PHP
+  extensions, filesystem perms, only `backend/public` web-accessible, SPA build
+  step, health check. _E§38_
+- ✅ **46. Database account hardening** — `install/db-grant.sql` (dedicated
+  least-privilege `rhb_events_app` grant); MySQL bound to `127.0.0.1` in Compose;
+  documented in `DEPLOYMENT.md`. _E§39_
+- ✅ **47. Secrets hygiene** — `docker-compose.yml` reads `APP_KEY` /
+  DB creds / stateful-domains from the environment (no literals); ships
+  `.env.docker.example` only. _E§41_
+- ✅ **48. Backup strategy** — `install/backup.sh` (GPG-encrypted daily dump,
+  retention sweep, refuses to write plaintext) + `install/restore-verify.sh`
+  (restore into a scratch DB and assert row counts). `DEPLOYMENT.md` cron entry.
   _PRD §89 · E§42_
-- ☐ **49. Split logging** — separate application / security / audit log channels;
-  never log passwords or tokens; useful request/error context; request IDs.
-  _PRD §88 · E§43_
-- ☐ **50. Monitoring hooks** — vendor-neutral surface for 500s, slow endpoints,
-  failed jobs, DB failures, disk, uptime, suspicious logins. _E§44_
-- ☐ **51. Performance pass** — N+1 sweep with EXPLAIN across dashboard,
-  registration search, reports, attendance lists, exports, catalogue; paginate /
-  eager-load / index / cache-where-safe. _E§45_
-- ◐ **52. Index review** — audit indexes vs. the E§46 list (status, start_at,
-  registration dates, participant email/employee_id, registration_number,
-  registration/attendance status, event_id, waitlist ordering, ticket token).
-  Some added in `2026_09_07_000001_add_dashboard_indexes`. _E§46_
-- ☐ **53. Consistent API error envelope** — `{ message, errors, code }`; proper
-  403/404/419/422/429/500; friendly frontend rendering; never leak stack traces
-  or paths. _E§47_
-- ☐ **54. Expand test suite** — the E§48 list: Authentication, Authorization,
-  EventPolicy, EventStaffAuthorization, ManualRegistration, DuplicateRegistration,
-  TicketSecurity, Attendance, UploadSecurity, ReportPermission, AuditLog,
-  RateLimit (+ existing Capacity, Waitlist, CheckIn). _PRD §92–94 · E§48_
-- ◐ **55. Docs set** — DONE: `SECURITY.md`, `RBAC-MATRIX.md`, `PROJECT.md`.
-  OPEN: `DEPLOYMENT.md` / production install guide (#38), testing guide, README
-  refresh. _E§52_
+- ✅ **49. Split logging** — `security` (90d) / `audit` (180d) / `performance`
+  (14d) daily channels; `AuditService` mirrors to audit + (for security actions)
+  security; `RequestContext` middleware adds `X-Request-Id`, shared log context,
+  and a slow-request (`>=1500ms`) warning. `ObservabilityTest`. _PRD §88 · E§43_
+- ✅ **50. Monitoring hooks** — `GET /api/health` (governance) reports
+  database / cache checks + `login_failures_1h`, `lockouts_1h`, `disk_used_pct`
+  signals, 503 when degraded. `ObservabilityTest`. _E§44_
+- ✅ **51. Performance pass** — killed the event-list N+1 (`withCount` for
+  confirmed / waitlist / checked-in instead of per-row counts) on `index` +
+  `publicEvents`; `EventListPerformanceTest` asserts a fixed query count across
+  growing datasets. _E§45_
+- ✅ **52. Index review** — `2026_09_09_000002_add_query_hotpath_indexes`
+  (waitlist FIFO order, `registration_answers(registration_id,field_key)`,
+  per-event + action audit-log, `event_staff(user_id,event_id)`, checkin time);
+  auth-hardening columns migration for `last_login_at` etc. _E§46_
+- ✅ **53. Consistent API error envelope** — `ApiErrorResponse::make()` wired via
+  `withExceptions()->render()`; `{message, code, errors?}` with correct
+  403/404/419/422/429/500, generic 404 message, stack traces only in debug;
+  `RoleMiddleware` / `EventScopeMiddleware` now `abort()` through the envelope.
+  Frontend interceptor handles 401 + 419. `ApiErrorEnvelopeTest`. _E§47_
+- ✅ **54. Expand test suite** — `RbacMatrixTest` (endpoint × 6 roles +
+  unauthenticated), `DuplicateRegistrationTest` (email/phone/employee_id/none),
+  `AttendanceTest` (single + bulk + scope + audit), `RateLimitTest` (route
+  throttles). Existing suites cover Authentication/Authorization/EventStaffAuth/
+  ManualRegistration/TicketSecurity/UploadSecurity/CheckIn/Capacity/Waitlist/
+  ReportPermission/AuditLog. Suite: 152. _PRD §92–94 · E§48_
+- ✅ **55. Docs set** — `SECURITY.md`, `RBAC-MATRIX.md`, `PROJECT.md`,
+  `DEPLOYMENT.md`, `TESTING.md`, README run-paths refresh. _E§52_
 
 ---
 

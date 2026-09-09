@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { apiClient, User } from '../../services/api';
+import { apiLogin, User } from '../../services/api';
 import { ArrowRight } from 'lucide-react';
 import { BrandMark } from '../../components/BrandMark';
 
@@ -28,14 +28,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onCancel }
     setError(null);
 
     try {
-      const res = await apiClient.post('/auth/login', {
-        email: loginEmail,
-        password: loginPass,
-      });
-
-      localStorage.setItem('rhb_events_token', res.data.token);
-      localStorage.setItem('rhb_events_user', JSON.stringify(res.data.user));
-      onLoginSuccess(res.data.user);
+      const user = await apiLogin(loginEmail, loginPass);
+      onLoginSuccess(user);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please verify credentials.');
     } finally {

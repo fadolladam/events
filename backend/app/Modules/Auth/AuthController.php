@@ -7,10 +7,12 @@ use App\Models\User;
 use App\Modules\Audit\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\TransientToken;
 
 class AuthController extends Controller
 {
@@ -46,8 +48,17 @@ class AuthController extends Controller
             ])->status(429);
         }
 
+        // A request from the first-party SPA carries a session (Sanctum's
+        // stateful middleware started one); it authenticates by cookie and
+        // needs no token. Other API clients get a bearer token.
+        $stateful = $request->hasSession();
+
         try {
-            $result = $this->authService->login($validated['email'], $validated['password']);
+            $result = $this->authService->login(
+                $validated['email'],
+                $validated['password'],
+                withToken: ! $stateful,
+            );
         } catch (ValidationException $e) {
             // Count the failure; the limiter's own decay gives the backoff.
             RateLimiter::hit($throttleKey, self::LOGIN_DECAY_SECONDS);
@@ -57,9 +68,15 @@ class AuthController extends Controller
 
         RateLimiter::clear($throttleKey);
 
+        if ($stateful) {
+            Auth::guard('web')->login($result['user']);
+            $request->session()->regenerate();
+        }
+
         return response()->json([
             'message' => 'Login successful',
             'user' => $result['user'],
+            'must_change_password' => (bool) $result['user']->must_change_password,
             'token' => $result['token'],
         ]);
     }
@@ -137,14 +154,28 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $user,
+            'must_change_password' => (bool) $user->must_change_password,
         ]);
     }
 
     public function logout(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        // Bearer-token clients: drop just the token that made this call.
+        $token = $user?->currentAccessToken();
+        if ($token && ! $token instanceof TransientToken) {
+            $token->delete();
+        }
+
+        // SPA cookie session: log out and tear the session down.
+        if ($request->hasSession()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
         if ($user) {
-            $user->currentAccessToken()->delete();
             AuditService::log(
                 action: 'user_logout',
                 entityType: 'User',
@@ -189,9 +220,16 @@ class AuthController extends Controller
             'password_changed_at' => now(),
         ])->save();
 
-        // Invalidate all other tokens; keep the one making this request.
-        $currentId = $user->currentAccessToken()?->id;
+        // Invalidate all other bearer tokens; keep the one making this call
+        // (a session-authed request has no real token, so all are dropped).
+        $token = $user->currentAccessToken();
+        $currentId = $token instanceof TransientToken ? null : $token?->id;
         $user->tokens()->when($currentId, fn ($q) => $q->where('id', '!=', $currentId))->delete();
+
+        // Session-authed request: rotate the session id but keep this one alive.
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
 
         AuditService::log(
             action: 'user_password_changed',

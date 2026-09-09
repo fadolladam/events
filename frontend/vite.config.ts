@@ -24,11 +24,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        secure: false,
-      },
+      // Keep API + Sanctum's CSRF-cookie route on the same origin as the SPA
+      // so session-cookie auth works through the dev server.
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true, secure: false },
+      '/sanctum': { target: 'http://127.0.0.1:8000', changeOrigin: true, secure: false },
     },
   },
 })

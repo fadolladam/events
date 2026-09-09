@@ -9,7 +9,12 @@ use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
-    public function login(string $email, string $password): array
+    /**
+     * @param  bool  $withToken  issue a personal access token in the result.
+     *                           The first-party SPA authenticates by session
+     *                           cookie and passes false; API clients pass true.
+     */
+    public function login(string $email, string $password, bool $withToken = true): array
     {
         $user = User::where('email', $email)->first();
 
@@ -42,7 +47,7 @@ class AuthService
             throw $genericFailure;
         }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        $token = $withToken ? $user->createToken('auth-token')->plainTextToken : null;
 
         $user->forceFill(['last_login_at' => now()])->save();
 

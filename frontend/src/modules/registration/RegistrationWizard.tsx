@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiClient, EventItem, Registration } from '../../services/api';
+import { apiClient, ensureCsrf, EventItem, Registration } from '../../services/api';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, Clock, Ticket, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
@@ -99,6 +99,7 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
         source: 'web_portal',
       };
 
+      await ensureCsrf();
       const res = await apiClient.post(`/public/events/${event.id}/register`, payload);
 
       setResult({

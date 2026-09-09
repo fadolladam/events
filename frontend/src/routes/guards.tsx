@@ -6,8 +6,13 @@ import { paths } from './paths';
 
 /** Blocks a subtree unless signed in; bounces to /login?next=… */
 export const RequireAuth: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const loc = useLocation();
+  // Wait for the boot GET /auth/me before deciding — otherwise a hard refresh
+  // on an admin page flashes the login screen.
+  if (loading) {
+    return <RouteSpinner label="Checking your session…" />;
+  }
   if (!user) {
     return <Navigate to={paths.login(loc.pathname + loc.search)} replace />;
   }

@@ -39,6 +39,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #5 Password security | ✅ policy (min 12 / mixed / numbers / symbols / pwned-in-prod), `POST /auth/password` self-change (revokes other tokens), `POST /users/{id}/force-password-reset`, `must_change_password` + `last_login_at` columns, seeders blocked in prod. Email reset-link flow deferred (needs notifications). `PasswordManagementTest` (8). |
 | 2026-09-09 | #7 MFA-ready / #8 SSO-ready | ◐ integration points documented in `SECURITY.md`; authorization layer already decoupled from the auth mechanism. Full TOTP / Entra OIDC not built (deliberate — no half-implementations). |
 | 2026-09-09 | #55 Docs | ◐ `SECURITY.md` + `RBAC-MATRIX.md` added. Still: `DEPLOYMENT.md`, production install guide, testing guide. |
+| 2026-09-09 | #4 SPA session/cookie auth | ✅ SPA now authenticates by Sanctum session cookie (HttpOnly, SameSite=lax, Secure-in-prod) + CSRF; `EnsureFrontendRequestsAreStateful` on the `api` group; login regenerates the session, logout invalidates it; no token in `localStorage` (only the non-secret profile, re-validated via `/auth/me` on boot); bearer tokens still work for non-browser clients. Verified end-to-end with curl (CSRF 419, session `/auth/me` 200, post-logout 401, bearer fallback 200). `SpaSessionAuthTest` (3). **Tier 1 core done — only #12 remains open.** |
 
 ---
 
@@ -47,7 +48,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | Tier | Done | Partial | Open / N-A |
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
-| **1 Security** | #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #4, #12 |
+| **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
 | 2 Core | #23, #27 | #28 | #18–#22, #24, #25, #26, #29, #30 |
 | 3 Admin/Dash | #27 | #42, #43 | #31–#41 (#40 ❌) |
 | 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
@@ -83,10 +84,16 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 ## TIER 1 — Security hardening (`implementations-2.md` Priority 1)
 
 ### Authentication
-- ☐ **4. SPA session auth** — move off `localStorage` bearer tokens to Sanctum
-  stateful cookie auth: HttpOnly + Secure + SameSite, CSRF, session regenerate on
-  login, invalidate on logout, expired-session handling, safe redirect preserving
-  `?next=`. Must not break public registration. _E§1_
+- ✅ **4. SPA session auth** — Sanctum stateful **cookie** auth: HttpOnly,
+  `SameSite=lax`, `Secure` in prod; CSRF via `/sanctum/csrf-cookie` +
+  `X-XSRF-TOKEN`; `EnsureFrontendRequestsAreStateful` prepended to the `api`
+  group; login → `session()->regenerate()`, logout → `invalidate()`. Token gone
+  from `localStorage` (only the non-secret profile cached, re-checked via
+  `/auth/me` on boot with a spinner so refresh doesn't flash the login page).
+  Bearer tokens still serve non-browser clients. Public registration keeps
+  working (SPA primes the CSRF cookie). Verified end-to-end with curl + 47 tests
+  incl. `SpaSessionAuthTest`. Config: `SANCTUM_STATEFUL_DOMAINS`,
+  `SESSION_SECURE_COOKIE`, `CORS_ALLOWED_ORIGINS`, vite proxy `/sanctum`. _E§1_
 - ✅ **5. Password security** — `PasswordRules` / `Password::defaults()` (min 12,
   mixed case, numbers, symbols; pwned-check in prod only). `POST /auth/password`
   self-change (verify current, forbid reuse, revoke other tokens, audited).

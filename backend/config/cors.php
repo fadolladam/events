@@ -32,6 +32,8 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    // The SPA authenticates with the session cookie, so cross-origin XHR (dev
+    // server on a different port) must be allowed to send/receive credentials.
+    'supports_credentials' => true,
 
 ];

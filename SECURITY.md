@@ -10,9 +10,23 @@ table and `TODO-MASTER.md` for outstanding work.
 
 ## Authentication
 
-- **Mechanism:** Laravel Sanctum personal access tokens (`Authorization:
-  Bearer`). Token TTL 480 min (`SANCTUM_TOKEN_EXPIRATION`).
+- **Mechanism:** the first-party SPA authenticates with the **Sanctum session
+  cookie** (HttpOnly, `SameSite=lax`, `Secure` in production). CSRF is enforced:
+  the SPA calls `GET /sanctum/csrf-cookie` once on boot and axios echoes the
+  `XSRF-TOKEN` cookie back as `X-XSRF-TOKEN`. Non-browser API clients (no
+  Origin/Referer from a stateful domain) continue to use a bearer **personal
+  access token** (`Authorization: Bearer`, TTL 480 min). Both resolve through
+  `auth:sanctum`.
+- Session middleware is added to the `api` group via
+  `EnsureFrontendRequestsAreStateful` (`bootstrap/app.php`); stateful hosts are
+  `config/sanctum.php` `stateful` (env `SANCTUM_STATEFUL_DOMAINS`).
 - **Login endpoint:** `POST /api/auth/login`, throttled `10/min` per IP.
+  - A stateful (SPA) login calls `Auth::guard('web')->login()` +
+    `session()->regenerate()` and returns `token: null`. A non-stateful login
+    returns a bearer token.
+  - **Logout** (`POST /api/auth/logout`): deletes the calling bearer token *and*
+    `Auth::guard('web')->logout()` + `session()->invalidate()` +
+    `regenerateToken()`.
   - Per **email + IP** lockout: 5 failed attempts → 15-minute lockout returning
     **429**; a correct password during the lockout is still refused; the counter
     clears on a successful login.
@@ -21,14 +35,10 @@ table and `TODO-MASTER.md` for outstanding work.
   - Every failed attempt and every lockout is written to `audit_logs`
     (`user_login_failed`, `user_login_locked_out`).
   - Successful login stamps `users.last_login_at`.
-- **Logout:** `POST /api/auth/logout` deletes the current token; audited.
-
-### Known gap — session/cookie auth (TODO-MASTER #4)
-
-The SPA still stores the bearer token in `localStorage` (XSS-exfiltratable).
-The planned target is Sanctum **stateful cookie** auth (HttpOnly + Secure +
-SameSite + CSRF, session regeneration on login). This is a cross-cutting change
-(every frontend request, CORS, session config) and is tracked but not yet done.
+- **No token in `localStorage`.** The SPA caches only the non-secret user
+  *profile* there (for instant paint) and re-validates it against
+  `GET /api/auth/me` on every boot. The credential lives in the HttpOnly
+  cookie, unreachable to JavaScript / XSS.
 
 ---
 

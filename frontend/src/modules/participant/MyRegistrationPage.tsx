@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { apiClient, Registration } from '../../services/api';
+import { apiClient, ensureCsrf, Registration } from '../../services/api';
 import { Ticket as TicketIcon, Search, Calendar, MapPin, CheckCircle2, Clock, AlertTriangle, ArrowLeft, Download } from 'lucide-react';
 
 interface MyRegistrationPageProps {
@@ -49,6 +49,7 @@ export const MyRegistrationPage: React.FC<MyRegistrationPageProps> = ({
     setError(null);
 
     try {
+      await ensureCsrf();
       const res = await apiClient.post('/public/registration/lookup', {
         registration_number: registrationNumber,
         email,

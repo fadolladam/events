@@ -2,36 +2,81 @@ import axios from 'axios';
 
 export const API_BASE_URL = '/api';
 
+/**
+ * The SPA authenticates with the Sanctum session cookie (HttpOnly), not a
+ * bearer token — so every request carries credentials, and axios mirrors the
+ * XSRF-TOKEN cookie into the X-XSRF-TOKEN header automatically.
+ */
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
+  withXSRFToken: true,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    Accept: 'application/json',
   },
 });
 
-// Inject auth token from localStorage if present
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('rhb_events_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const USER_KEY = 'rhb_events_user';
 
-// Error handling interceptor
+/**
+ * Prime the CSRF cookie. Call once before the first mutating request (login,
+ * public registration). Cheap and idempotent — Laravel refreshes the cookie on
+ * every subsequent stateful response.
+ */
+export const ensureCsrf = (): Promise<unknown> =>
+  axios.get('/sanctum/csrf-cookie', { withCredentials: true });
+
+/** POST /auth/login — establishes the session cookie. Returns the user. */
+export const apiLogin = async (email: string, password: string): Promise<User> => {
+  await ensureCsrf();
+  const res = await apiClient.post('/auth/login', { email, password });
+  return res.data.user as User;
+};
+
+/** POST /auth/logout — best effort; always resolves. */
+export const apiLogout = async (): Promise<void> => {
+  try {
+    await apiClient.post('/auth/logout');
+  } catch {
+    /* already gone */
+  }
+};
+
+/** GET /auth/me — returns the signed-in user, or null when there's no session. */
+export const fetchMe = async (): Promise<User | null> => {
+  try {
+    const res = await apiClient.get('/auth/me');
+    return res.data.user as User;
+  } catch {
+    return null;
+  }
+};
+
+// On 401, drop the cached profile and bounce to /login (once).
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token if unauthenticated
-      if (!window.location.pathname.includes('/login')) {
-        localStorage.removeItem('rhb_events_token');
-        localStorage.removeItem('rhb_events_user');
+      try {
+        localStorage.removeItem(USER_KEY);
+      } catch {
+        /* ignore */
+      }
+      const path = window.location.pathname;
+      const onPublic =
+        path === '/' ||
+        path.startsWith('/events/') ||
+        path.startsWith('/ticket/') ||
+        path === '/lookup' ||
+        path.startsWith('/login');
+      if (!onPublic) {
+        const next = encodeURIComponent(path + window.location.search);
+        window.location.assign(`/login?next=${next}`);
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 /* Type definitions */
@@ -51,6 +96,7 @@ export interface User {
   role: UserRole;
   phone?: string;
   organization?: { id: number; name: string };
+  must_change_password?: boolean;
 }
 
 /**
@@ -68,11 +114,25 @@ export const ROLE_TIERS = {
 export const hasRole = (role: string | undefined | null, allowed: readonly string[]): boolean =>
   !!role && allowed.includes(role);
 
+/**
+ * The signed-in user's profile is cached in localStorage purely so the admin
+ * shell can paint immediately on reload. It is NOT a credential (that's the
+ * HttpOnly session cookie) and is re-validated against GET /auth/me on boot.
+ */
 export const getStoredUser = (): User | null => {
   try {
-    return JSON.parse(localStorage.getItem('rhb_events_user') || 'null');
+    return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
   } catch {
     return null;
+  }
+};
+
+export const cacheUser = (user: User | null): void => {
+  try {
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+    else localStorage.removeItem(USER_KEY);
+  } catch {
+    /* private mode / storage disabled — fine, we still have it in memory */
   }
 };
 

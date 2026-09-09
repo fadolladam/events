@@ -20,12 +20,13 @@ import { AuditLogsPage } from './modules/audit/AuditLogsPage';
 
 /* -------- /login -------- */
 const LoginRoute: React.FC = () => {
-  const { user, setSession } = useAuth();
+  const { user, loading, setSession } = useAuth();
   const navigate = useNavigate();
   const [sp] = useSearchParams();
   const next = sp.get('next') || paths.dashboard();
 
-  if (user) return <Navigate to={next} replace />;
+  // Don't redirect on a stale cached profile before the session check lands.
+  if (!loading && user) return <Navigate to={next} replace />;
 
   return (
     <LoginPage

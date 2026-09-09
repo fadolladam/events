@@ -88,8 +88,8 @@ export const AdminLayout: React.FC = () => {
               <div className="text-[10px] text-indigo-300 uppercase font-mono">{user.role.replace('_', ' ')}</div>
             </div>
             <button
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate(paths.login());
               }}
               className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-white/10 transition-colors"

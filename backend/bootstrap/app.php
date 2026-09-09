@@ -9,6 +9,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -38,6 +39,14 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // First-party SPA (same origin) authenticates with the session cookie:
+        // requests from a configured stateful domain get the session + CSRF
+        // stack; everyone else (curl, other API clients) still uses a bearer
+        // token via `auth:sanctum`.
+        $middleware->api(prepend: [
+            EnsureFrontendRequestsAreStateful::class,
+        ]);
+
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'event.scope' => EventScopeMiddleware::class,

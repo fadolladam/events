@@ -33,11 +33,11 @@ Primary user journeys:
 
 | Layer | Stack |
 |---|---|
-| Backend | PHP 8.3+, Laravel 13.17+, Sanctum bearer tokens, MySQL 8 (SQLite supported) |
+| Backend | PHP 8.3+, Laravel 13.17+, Sanctum (SPA session cookie + bearer tokens), MySQL 8 (SQLite supported) |
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 4, React Router 7 |
 | QR | `simplesoftwareio/simple-qrcode` (backend) · `qrcode` + `html5-qrcode` (frontend) |
 | PDF | `barryvdh/laravel-dompdf` |
-| Auth | Laravel Sanctum (personal access tokens, `Authorization: Bearer`) |
+| Auth | Laravel Sanctum — SPA uses the session cookie + CSRF; other API clients use `Authorization: Bearer`. See `SECURITY.md` |
 | Dev tooling | Pint, PHPUnit 12, Pail; oxlint (frontend) |
 | Delivery | Single Laravel app. Docker Compose, XAMPP, or any PHP 8.3+/MySQL host |
 
@@ -261,8 +261,11 @@ readiness. Rendered by ~18 SVG widgets under `src/modules/admin/dashboard/`.
 
 ## 6. API surface (`backend/routes/api.php`)
 
-Base path `/api`. Auth = `Authorization: Bearer <sanctum token>`.
-`RoleMiddleware` (`role:` alias) lets **`super_admin`** through unconditionally.
+Base path `/api`. Auth = Sanctum session cookie (first-party SPA) **or**
+`Authorization: Bearer <token>` (other clients); both via `auth:sanctum`.
+`RoleMiddleware` (`role:` alias) lets **`super_admin`** through unconditionally;
+`EventScopeMiddleware` (`event.scope`) confines non-org-wide roles to their
+assigned events.
 
 ### Public (no auth)
 
@@ -336,10 +339,12 @@ Seven roles: `super_admin` → `event_admin` → `event_organizer` →
   `hasRole(role, allowed)` helper; `RequireAuth` / `RequireRole` route guards
   and nav/action gating in the UI. The mirror is intentionally kept in sync
   with `routes/api.php`.
-- Tokens are stored in `localStorage` (`rhb_events_token`, `rhb_events_user`);
-  a 401 interceptor clears them and bounces to `/login?next=…`.
-- Per-event role grants also exist in `event_staff` (owner/manager/organizer/
-  registration_officer/checkin_staff/viewer) for finer scoping.
+- Auth is the **Sanctum session cookie** (HttpOnly) — no token in
+  `localStorage`; only the non-secret user profile is cached there
+  (`rhb_events_user`) and re-validated via `GET /auth/me` on boot. A 401
+  interceptor clears the cache and bounces to `/login?next=…`.
+- Per-event role grants in `event_staff` are enforced by `EventScopeMiddleware`
+  (non-org-wide roles only reach their assigned events).
 
 ---
 
@@ -353,9 +358,10 @@ Seven roles: `super_admin` → `event_admin` → `event_organizer` →
 - **URL single source of truth**: `src/routes/paths.ts` — import helpers, never
   hand-write path strings.
 - **API layer**: `src/services/api.ts` — a single axios instance (`baseURL
-  /api`), request interceptor injects the bearer token, response interceptor
-  handles 401; all TypeScript request/response types live here too.
-- **Auth context**: `src/services/auth.tsx` (`useAuth`, `setSession`).
+  /api`, `withCredentials`), `ensureCsrf()` / `apiLogin()` / `apiLogout()` /
+  `fetchMe()` helpers, a 401 interceptor; all TypeScript types live here too.
+- **Auth context**: `src/services/auth.tsx` (`useAuth`, `setSession`,
+  `loading`) — primes the CSRF cookie and calls `/auth/me` on boot.
 - **Feature modules** under `src/modules/`: `auth`, `public` (catalogue +
   detail), `registration` (multi-step wizard rendering the dynamic form),
   `participant` (my-registration), `ticket`, `admin` (events management, event

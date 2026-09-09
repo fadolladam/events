@@ -45,6 +45,12 @@ services:
       DB_DATABASE: ${DB_DATABASE:-events}
       DB_USERNAME: ${DB_USERNAME:-events_user}
       DB_PASSWORD: ${DB_PASSWORD:-events_secret}
+      # First-party SPA cookie auth. The app is loaded from :5173.
+      SANCTUM_STATEFUL_DOMAINS: localhost:5173,127.0.0.1:5173,localhost,127.0.0.1
+      SESSION_DRIVER: database
+      SESSION_SECURE_COOKIE: "false"
+      SESSION_SAME_SITE: lax
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
     ports:
       # Whole app (SPA + API) on http://localhost:5173
       - "5173:8000"

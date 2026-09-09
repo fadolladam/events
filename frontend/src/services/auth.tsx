@@ -1,42 +1,52 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from './api';
-
-const TOKEN_KEY = 'rhb_events_token';
-const USER_KEY = 'rhb_events_user';
-
-const readUser = (): User | null => {
-  try {
-    return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
-  } catch {
-    return null;
-  }
-};
+import { apiLogout, cacheUser, ensureCsrf, fetchMe, getStoredUser } from './api';
 
 interface AuthValue {
   user: User | null;
-  /** persist the signed-in user (token is stored by the login call itself) */
-  setSession: (user: User, token?: string) => void;
-  logout: () => void;
+  /** true until the initial GET /auth/me has resolved */
+  loading: boolean;
+  /** persist the signed-in user after a successful login call */
+  setSession: (user: User) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => readUser());
+  // Paint from the cached profile immediately, then confirm with the server.
+  const [user, setUser] = useState<User | null>(() => getStoredUser());
+  const [loading, setLoading] = useState(true);
 
-  const setSession = useCallback((nextUser: User, token?: string) => {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Prime the CSRF cookie so the first mutating request (login, public
+      // registration) succeeds, then check for an existing session.
+      await ensureCsrf().catch(() => undefined);
+      const me = await fetchMe();
+      if (cancelled) return;
+      setUser(me);
+      cacheUser(me);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const setSession = useCallback((nextUser: User) => {
+    cacheUser(nextUser);
     setUser(nextUser);
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+  const logout = useCallback(async () => {
+    await apiLogout();
+    cacheUser(null);
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, setSession, logout }), [user, setSession, logout]);
+  const value = useMemo(() => ({ user, loading, setSession, logout }), [user, loading, setSession, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

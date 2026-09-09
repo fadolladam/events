@@ -25,6 +25,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // This seeder plants well-known demo credentials (password123). Never in
+        // production — run migrations only there and create accounts via the API.
+        if (app()->isProduction()) {
+            throw new \RuntimeException('DatabaseSeeder carries demo credentials and must not run in production.');
+        }
+
         // Reusable registration-form templates (idempotent, safe on every boot)
         $this->call(FormTemplateSeeder::class);
 

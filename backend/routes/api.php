@@ -69,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Available to any authenticated account (incl. participant)
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::post('/auth/password', [AuthController::class, 'changePassword'])->middleware('throttle:10,1');
 
     /*
     | Read-only console access — every staff role
@@ -161,5 +162,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/users', [AuthController::class, 'users']);
         Route::post('/users', [AuthController::class, 'storeUser'])->middleware('throttle:20,1');
+        Route::post('/users/{id}/force-password-reset', [AuthController::class, 'forcePasswordReset'])->middleware('throttle:20,1');
     });
 });

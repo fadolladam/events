@@ -69,7 +69,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
+            'password' => PasswordRules::forCreate(),
             'phone' => 'nullable|string|max:50',
         ]);
 
@@ -95,9 +95,10 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
+            'password' => PasswordRules::forAdminSet(),
             'phone' => 'nullable|string|max:50',
             'role' => 'required|string|in:super_admin,event_admin,event_organizer,registration_officer,checkin_staff,viewer,participant',
+            'must_change_password' => 'sometimes|boolean',
         ]);
 
         // Only a super_admin may mint another super_admin.
@@ -114,6 +115,10 @@ class AuthController extends Controller
             'role' => $validated['role'],
             'phone' => $validated['phone'] ?? null,
             'status' => 'active',
+            // Admin-provisioned accounts must rotate the password on first login
+            // unless the creator explicitly opts out.
+            'must_change_password' => $validated['must_change_password'] ?? true,
+            'password_changed_at' => now(),
         ]);
 
         AuditService::log(
@@ -150,6 +155,76 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Logged out successfully',
         ]);
+    }
+
+    /**
+     * Change the authenticated user's own password. Requires the current
+     * password, enforces the policy, clears must_change_password, and revokes
+     * every other session token.
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'password' => PasswordRules::forCreate(),
+        ]);
+
+        $user = $request->user();
+
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Your current password is incorrect.'],
+            ]);
+        }
+
+        if (Hash::check($validated['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['The new password must be different from the current one.'],
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($validated['password']),
+            'must_change_password' => false,
+            'password_changed_at' => now(),
+        ])->save();
+
+        // Invalidate all other tokens; keep the one making this request.
+        $currentId = $user->currentAccessToken()?->id;
+        $user->tokens()->when($currentId, fn ($q) => $q->where('id', '!=', $currentId))->delete();
+
+        AuditService::log(
+            action: 'user_password_changed',
+            entityType: 'User',
+            entityId: (string) $user->id,
+        );
+
+        return response()->json(['message' => 'Password updated.']);
+    }
+
+    /**
+     * Governance action: flag another account so it must set a new password on
+     * next login, and drop its live sessions immediately.
+     */
+    public function forcePasswordReset(Request $request, string $id): JsonResponse
+    {
+        $target = User::findOrFail($id);
+
+        if ($target->role === 'super_admin' && $request->user()->role !== 'super_admin') {
+            return response()->json(['message' => 'Only a super admin can do this to a super admin.'], 403);
+        }
+
+        $target->forceFill(['must_change_password' => true])->save();
+        $target->tokens()->delete();
+
+        AuditService::log(
+            action: 'user_password_reset_forced',
+            entityType: 'User',
+            entityId: (string) $target->id,
+            newValue: ['by' => $request->user()?->email],
+        );
+
+        return response()->json(['message' => 'The user must set a new password on next sign-in.']);
     }
 
     public function users(Request $request): JsonResponse

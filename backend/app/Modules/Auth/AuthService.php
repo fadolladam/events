@@ -44,6 +44,8 @@ class AuthService
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
+        $user->forceFill(['last_login_at' => now()])->save();
+
         AuditService::log(
             action: 'user_login',
             entityType: 'User',

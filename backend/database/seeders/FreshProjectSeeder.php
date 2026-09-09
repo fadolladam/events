@@ -26,6 +26,10 @@ class FreshProjectSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->isProduction()) {
+            throw new \RuntimeException('FreshProjectSeeder carries demo credentials and must not run in production.');
+        }
+
         // Built-in reusable registration forms
         $this->call(FormTemplateSeeder::class);
 

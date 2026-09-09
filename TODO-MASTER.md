@@ -40,6 +40,10 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #7 MFA-ready / #8 SSO-ready | ◐ integration points documented in `SECURITY.md`; authorization layer already decoupled from the auth mechanism. Full TOTP / Entra OIDC not built (deliberate — no half-implementations). |
 | 2026-09-09 | #55 Docs | ◐ `SECURITY.md` + `RBAC-MATRIX.md` added. Still: `DEPLOYMENT.md`, production install guide, testing guide. |
 | 2026-09-09 | #4 SPA session/cookie auth | ✅ SPA now authenticates by Sanctum session cookie (HttpOnly, SameSite=lax, Secure-in-prod) + CSRF; `EnsureFrontendRequestsAreStateful` on the `api` group; login regenerates the session, logout invalidates it; no token in `localStorage` (only the non-secret profile, re-validated via `/auth/me` on boot); bearer tokens still work for non-browser clients. Verified end-to-end with curl (CSRF 419, session `/auth/me` 200, post-logout 401, bearer fallback 200). `SpaSessionAuthTest` (3). **Tier 1 core done — only #12 remains open.** |
+| 2026-09-09 | #18 Registration detail | ◐ backend: `POST /registrations/{id}/reissue-ticket`, `PATCH /registrations/{id}` (notes); UI: note editor (save-on-blur) + reissue button in the expanded row. OPEN: full status-history timeline in the UI. |
+| 2026-09-09 | #20 + #26 Bulk actions | ✅ `POST /events/{id}/registrations/bulk` (approve/reject/cancel) + `POST /events/{id}/attendance/bulk`; approve/reject moved into `RegistrationService` so single + bulk share one locked path; UI: row checkboxes + select-all + bulk bar. `RegistrationOpsTest`. |
+| 2026-09-09 | #22 Registration filters | ✅ `indexForEvent` gains department / date_from / date_to / checked_in; UI filter bar with Clear. |
+| 2026-09-09 | #23 Form field types | ✅ textarea, employee_id, date, time, multi_select, consent, info added — allow-listed on save, server-validated (consent-required, option membership, date/time/number format), rendered in the builder + public wizard + manual-reg modal. `FormFieldTypesTest`. File upload deferred. |
 
 ---
 
@@ -49,8 +53,8 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
 | **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
-| 2 Core | #23, #27 | #28 | #18–#22, #24, #25, #26, #29, #30 |
-| 3 Admin/Dash | #27 | #42, #43 | #31–#41 (#40 ❌) |
+| **2 Core** | #20, #22, #23 | #18, #28 | #19, #21, #24, #25, #26, #27, #29, #30 |
+| 3 Admin/Dash | #27-adjacent | #42, #43 | #31–#41 (#40 ❌) |
 | 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
 | 5 Housekeeping | #56 | — | #57, #58 |
 
@@ -169,28 +173,35 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 ## TIER 2 — Core function improvements
 
 ### Registrations & participants
-- ☐ **18. Registration Detail page** — dedicated view: status-history timeline,
-  per-registration notes editing, **resend ticket**. Today only an inline row
-  expand. _PRD §37_
+- ◐ **18. Registration Detail** — DONE: `PATCH /registrations/{id}` (edit
+  internal note) + `POST /registrations/{id}/reissue-ticket` (revoke + fresh
+  QR); UI note editor (save-on-blur) + reissue button in the expanded row.
+  OPEN: a full status-history timeline in the UI (backend `show` already
+  returns `statusHistory`). _PRD §37_
 - ☐ **19. Global Participant Management + employee search** — cross-event
   participant list; search by employee ID / name / email / phone / department;
   autocomplete, duplicate warning, participant preview; seam for a corporate
   directory API. _PRD §36 · E§17_
-- ☐ **20. Bulk actions** — bulk approve / reject / cancel / export-selected on the
-  registrations table; authorized bulk attendance status changes. _PRD §82 ·
-  E§24, §26_
+- ✅ **20. Bulk actions** — `POST /events/{id}/registrations/bulk`
+  (approve/reject/cancel a selection, each through the shared locked service
+  path, `skipped[]` for bad ids, audited) + `POST /events/{id}/attendance/bulk`.
+  UI: row checkboxes + select-all + a bulk action bar. `RegistrationOpsTest`.
+  (Export-selected folds into #35.) _PRD §82 · E§24, §26_
 - ☐ **21. CSV import (endpoint + UI)** — promote the existing
   `registrations:import` artisan command to an authorized HTTP endpoint + admin
   screen, reusing `RegistrationService`. _PRD §83_
-- ☐ **22. Registration table filters** — add department, date range, approval
-  state, waitlist-only, checked-in toggle (keep current status / attendance /
-  free-text + pagination). _E§24_
+- ✅ **22. Registration table filters** — `indexForEvent` adds `department`
+  (like), `date_from` / `date_to` (registered_at), `checked_in` yes/no,
+  alongside the existing status / attendance / free-text + pagination. UI
+  filter bar with one-click Clear. _E§24_
 
 ### Forms
-- ☐ **23. Form-builder field types** — add textarea, employee-ID, date, time,
-  multi-select, file upload (if safely supported), info/display text, consent
-  checkbox. Currently only text/email/phone/number/select/radio/checkbox.
-  Server-side validation for each. _PRD §17 · E§20_
+- ◐ **23. Form-builder field types** — DONE: textarea, employee_id, date, time,
+  multi_select, consent, info — allow-listed on save, server-validated
+  (consent-required, option membership, date/time/number format), rendered in
+  the builder, public wizard, and manual-reg modal. `FormFieldTypesTest`.
+  OPEN: **file upload** — deferred to its own storage-security pass. _PRD §17 ·
+  E§20_
 - ☐ **24. Conditional form logic** — the `conditional_logic` column + TS type
   exist; implement show/hide rules in the builder **and** the public form.
   _PRD §63 · E§20_

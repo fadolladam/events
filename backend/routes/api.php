@@ -16,6 +16,7 @@ use App\Modules\Notifications\NotificationController;
 use App\Modules\Registration\ParticipantController;
 use App\Modules\Registration\RegistrationController;
 use App\Modules\Reports\ReportController;
+use App\Modules\Search\SearchController;
 use App\Modules\Tickets\TicketController;
 use App\Modules\Waitlist\WaitlistController;
 use Illuminate\Support\Facades\Route;
@@ -78,6 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::middleware([ROLE_STAFF, 'event.scope'])->group(function () {
         Route::get('/dashboard/stats', [ReportController::class, 'globalStats']);
+        Route::get('/search', SearchController::class)->middleware('throttle:60,1');
         Route::get('/dashboard/overview', [DashboardController::class, 'overview']);
         Route::get('/events/{eventId}/analytics', [ReportController::class, 'eventStats']);
 

@@ -5,6 +5,7 @@ import { useAuth } from '../services/auth';
 import { paths } from '../routes/paths';
 import { EventWizardModal } from '../modules/admin/EventWizardModal';
 import { BrandMark } from './BrandMark';
+import { GlobalSearch } from './GlobalSearch';
 import { LayoutDashboard, Calendar, Users, ShieldCheck, LogOut, ExternalLink } from 'lucide-react';
 
 const NAV_ITEMS: { to: string; label: string; icon: typeof LayoutDashboard; allow: readonly string[] }[] = [
@@ -103,6 +104,9 @@ export const AdminLayout: React.FC = () => {
       </aside>
 
       <main className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-6 py-2.5 backdrop-blur">
+          <GlobalSearch />
+        </div>
         <Outlet context={{ openCreateEvent } satisfies AdminOutletCtx} />
       </main>
 

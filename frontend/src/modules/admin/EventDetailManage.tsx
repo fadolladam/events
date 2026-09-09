@@ -480,6 +480,18 @@ export const EventDetailManage: React.FC = () => {
                     <Upload className="h-3.5 w-3.5" />
                     Import CSV
                   </button>
+                  <button
+                    onClick={() => {
+                      const p = new URLSearchParams();
+                      Object.entries(regFilters).forEach(([k, v]) => { if (v) p.set(k, v); });
+                      const qs = p.toString();
+                      window.open(`/api/events/${eventUuid}/export/csv${qs ? `?${qs}` : ''}`, '_blank');
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    <Upload className="h-3.5 w-3.5 rotate-180" />
+                    Export CSV
+                  </button>
                 </>
               )}
               <label className="text-[11px] text-slate-400">Per page</label>

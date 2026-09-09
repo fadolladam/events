@@ -5,6 +5,7 @@ namespace App\Modules\Reports;
 use App\Http\Controllers\Controller;
 use App\Modules\Audit\AuditService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class ReportController extends Controller
@@ -27,17 +28,17 @@ class ReportController extends Controller
         return response()->json($analytics);
     }
 
-    public function exportCsv(string $eventId): Response
+    public function exportCsv(Request $request, string $eventId): Response
     {
         AuditService::log(
             action: 'report_exported',
             entityType: 'Event',
             entityId: $eventId,
             eventId: $eventId,
-            newValue: ['format' => 'csv'],
+            newValue: ['format' => 'csv', 'filters' => $request->only(['status', 'attendance_status', 'checked_in', 'department', 'date_from', 'date_to', 'search'])],
         );
 
-        return $this->reportService->exportCsv($eventId);
+        return $this->reportService->exportCsv($eventId, $request);
     }
 
     public function exportPdf(string $eventId): Response

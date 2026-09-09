@@ -153,6 +153,53 @@ export const EventReportsPage: React.FC<EventReportsPageProps> = ({ eventId, onB
             ))}
           </div>
         </div>
+
+        {/* Department Breakdown */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <h3 className="text-sm font-bold text-slate-900">Department Breakdown</h3>
+          <div className="space-y-2">
+            {(data.departments || []).length === 0 ? (
+              <p className="text-xs text-slate-400">No department data.</p>
+            ) : (
+              (data.departments || []).map((d: any) => (
+                <div key={d.department} className="flex items-center justify-between border-b border-slate-100 py-2 text-xs">
+                  <span className="font-semibold text-slate-700">{d.department}</span>
+                  <span className="font-mono font-bold text-slate-900">{d.count}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Form Answers */}
+        {(data.answer_summary || []).length > 0 && (
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
+            <h3 className="text-sm font-bold text-slate-900">Form Answers</h3>
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {(data.answer_summary || []).map((f: any) => {
+                const max = Math.max(1, ...f.options.map((o: any) => o.count));
+                return (
+                  <div key={f.field_key}>
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">{f.label}</p>
+                    <div className="space-y-1.5">
+                      {f.options.map((o: any) => (
+                        <div key={o.value} className="text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">{o.value}</span>
+                            <span className="font-mono font-bold text-slate-900">{o.count}</span>
+                          </div>
+                          <div className="mt-0.5 h-1.5 rounded-full bg-slate-100">
+                            <div className="h-1.5 rounded-full bg-indigo-500" style={{ width: `${(o.count / max) * 100}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

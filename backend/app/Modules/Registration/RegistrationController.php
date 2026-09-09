@@ -238,44 +238,7 @@ class RegistrationController extends Controller
         $query = Registration::where('event_id', $event->id)
             ->with(['participant', 'ticket', 'answers']);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        if ($request->filled('attendance_status')) {
-            $query->where('attendance_status', $request->input('attendance_status'));
-        }
-
-        // checked_in shortcut: "yes" -> checked_in, "no" -> not yet
-        if ($request->filled('checked_in')) {
-            $yes = filter_var($request->input('checked_in'), FILTER_VALIDATE_BOOL);
-            $query->where('attendance_status', $yes ? '=' : '!=', 'checked_in');
-        }
-
-        if ($request->filled('department')) {
-            $dept = $request->input('department');
-            $query->whereHas('participant', fn ($q) => $q->where('department', 'like', "%{$dept}%"));
-        }
-
-        if ($request->filled('date_from')) {
-            $query->where('registered_at', '>=', $request->date('date_from')->startOfDay());
-        }
-        if ($request->filled('date_to')) {
-            $query->where('registered_at', '<=', $request->date('date_to')->endOfDay());
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('registration_number', 'like', "%{$search}%")
-                    ->orWhereHas('participant', function ($pq) use ($search) {
-                        $pq->where('name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%")
-                            ->orWhere('employee_id', 'like', "%{$search}%");
-                    });
-            });
-        }
+        RegistrationFilters::apply($query, $request);
 
         $perPage = min(500, max(1, (int) $request->input('per_page', 25)));
         // registration_sequence is atomic + monotonic, so it gives a stable

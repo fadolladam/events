@@ -8,7 +8,10 @@ use App\Models\Event;
 use App\Models\NotificationLog;
 use App\Models\Participant;
 use App\Models\Registration;
+use App\Models\RegistrationAnswer;
+use App\Modules\Registration\RegistrationFilters;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +67,59 @@ class ReportService
         ];
     }
 
+    /**
+     * Per-option counts for every choice field on the event's form, over
+     * non-cancelled registrations. Feeds the "Form Answers" report.
+     *
+     * @return array<int, array{field_key:string, label:string, type:string, options:array<int, array{value:string, count:int}>}>
+     */
+    private function formAnswerSummary(Event $event): array
+    {
+        $form = $event->form()->with('fields')->first();
+        if (! $form) {
+            return [];
+        }
+
+        $choiceFields = $form->fields
+            ->whereIn('type', ['select', 'radio', 'checkbox', 'multi_select'])
+            ->where('is_hidden', false);
+
+        if ($choiceFields->isEmpty()) {
+            return [];
+        }
+
+        $liveRegIds = Registration::where('event_id', $event->id)
+            ->whereNotIn('status', ['cancelled', 'rejected'])
+            ->pluck('id');
+
+        $out = [];
+        foreach ($choiceFields as $field) {
+            $answers = RegistrationAnswer::whereIn('registration_id', $liveRegIds)
+                ->where('field_key', $field->field_key)
+                ->get(['value_text', 'value_json']);
+
+            $counts = [];
+            foreach ((array) $field->options as $opt) {
+                $counts[$opt] = 0;
+            }
+            foreach ($answers as $a) {
+                $vals = is_array($a->value_json) ? $a->value_json : [$a->value_text];
+                foreach (array_filter($vals, fn ($v) => $v !== null && $v !== '') as $v) {
+                    $counts[$v] = ($counts[$v] ?? 0) + 1;
+                }
+            }
+
+            $out[] = [
+                'field_key' => $field->field_key,
+                'label' => $field->label,
+                'type' => $field->type,
+                'options' => collect($counts)->map(fn ($c, $v) => ['value' => (string) $v, 'count' => $c])->values()->all(),
+            ];
+        }
+
+        return $out;
+    }
+
     public function getEventAnalytics(string $eventId): array
     {
         $event = Event::findOrFail($eventId);
@@ -100,6 +156,18 @@ class ReportService
             ->groupBy('source')
             ->get();
 
+        // Department breakdown (from participants, non-cancelled registrations)
+        $departments = Registration::where('event_id', $eventId)
+            ->whereNotIn('status', ['cancelled', 'rejected'])
+            ->join('participants', 'registrations.participant_id', '=', 'participants.id')
+            ->select(DB::raw("COALESCE(NULLIF(participants.department, ''), 'Unspecified') as department"), DB::raw('count(*) as count'))
+            ->groupBy('department')
+            ->orderByDesc('count')
+            ->get();
+
+        // Form-answers summary: option counts for every choice field.
+        $answerSummary = $this->formAnswerSummary($event);
+
         return array_merge([
             'event' => $event,
             'capacity' => $event->capacity,
@@ -115,6 +183,8 @@ class ReportService
             'capacity_utilization' => $capacityUtilization,
             'registrations_by_date' => $registrationsByDate,
             'sources' => $sources,
+            'departments' => $departments,
+            'answer_summary' => $answerSummary,
         ], $this->eventOperationsDetail($event, [
             'confirmed' => $confirmed,
             'waitlisted' => $waitlisted,
@@ -261,55 +331,68 @@ class ReportService
         ];
     }
 
-    public function exportCsv(string $eventId): StreamedResponse
+    public function exportCsv(string $eventId, ?Request $request = null): StreamedResponse
     {
-        $event = Event::findOrFail($eventId);
+        $request ??= request();
+        $event = Event::with('form.fields')->findOrFail($eventId);
+        $tz = $event->timezone ?: config('app.timezone');
         $filename = 'RHB_Events_'.$event->event_code.'_Attendees_'.date('Ymd_His').'.csv';
 
-        $registrations = Registration::where('event_id', $eventId)
-            ->with(['participant', 'answers'])
-            ->orderBy('registration_sequence', 'asc')
-            ->get();
+        // One column per non-hidden, non-core form field (in field order).
+        $answerFields = $event->form
+            ? $event->form->fields
+                ->where('is_hidden', false)
+                ->whereNotIn('field_key', ['full_name', 'email', 'phone'])
+                ->where('type', '!=', 'info')
+                ->sortBy('field_order')
+                ->values()
+            : collect();
 
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
+        $query = Registration::where('event_id', $eventId)->with(['participant', 'answers']);
+        RegistrationFilters::apply($query, $request);
+        $registrations = $query->orderBy('registration_sequence', 'asc')->get();
 
-        return new StreamedResponse(function () use ($registrations) {
+        $fmt = fn ($d) => $d ? Carbon::parse($d)->timezone($tz)->format('Y-m-d H:i:s') : '';
+
+        return new StreamedResponse(function () use ($registrations, $answerFields, $fmt, $tz) {
             $handle = fopen('php://output', 'w');
 
-            // Header row
-            fputcsv($handle, [
-                'Registration Number',
-                'Participant Name',
-                'Email',
-                'Phone',
-                'Status',
-                'Attendance Status',
-                'Queue Position',
-                'Registered At',
-                'Confirmed At',
-                'Checked In At',
-            ]);
+            fputcsv($handle, array_merge([
+                'Registration Number', 'Participant Name', 'Email', 'Phone', 'Employee ID', 'Department',
+                'Status', 'Attendance Status', 'Queue Position',
+                "Registered At ({$tz})", "Confirmed At ({$tz})", "Checked In At ({$tz})",
+            ], $answerFields->pluck('label')->all()));
 
             foreach ($registrations as $reg) {
-                fputcsv($handle, [
+                $byKey = $reg->answers->keyBy('field_key');
+                $row = [
                     $reg->registration_number,
                     $reg->participant->name,
                     $reg->participant->email,
                     $reg->participant->phone ?? '',
+                    $reg->participant->employee_id ?? '',
+                    $reg->participant->department ?? '',
                     strtoupper($reg->status),
                     strtoupper(str_replace('_', ' ', $reg->attendance_status)),
                     $reg->status === 'waitlisted' ? $reg->getQueuePosition() : '',
-                    $reg->registered_at ? $reg->registered_at->format('Y-m-d H:i:s') : '',
-                    $reg->confirmed_at ? $reg->confirmed_at->format('Y-m-d H:i:s') : '',
-                    $reg->checked_in_at ? $reg->checked_in_at->format('Y-m-d H:i:s') : '',
-                ]);
+                    $fmt($reg->registered_at),
+                    $fmt($reg->confirmed_at),
+                    $fmt($reg->checked_in_at),
+                ];
+                foreach ($answerFields as $field) {
+                    $a = $byKey->get($field->field_key);
+                    $row[] = $a
+                        ? (is_array($a->value_json) ? implode(' | ', $a->value_json) : ($a->value_text ?? ''))
+                        : '';
+                }
+                fputcsv($handle, $row);
             }
 
             fclose($handle);
-        }, 200, $headers);
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
     }
 
     public function exportPdfReport(string $eventId): Response

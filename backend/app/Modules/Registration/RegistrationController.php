@@ -60,6 +60,78 @@ class RegistrationController extends Controller
         ], 201);
     }
 
+    /**
+     * Admin-side manual registration (walk-in / phone / assisted sign-up).
+     * Routed behind the registration-officer tier. Deliberately funnels through
+     * the SAME RegistrationService::register() as the public form so capacity,
+     * duplicate rules, approval mode, waitlist, sequence allocation, the
+     * permanent registration number, QR ticket issuance, status history and the
+     * audit log all behave identically.
+     */
+    public function storeManual(Request $request, string $eventId): JsonResponse
+    {
+        $event = Event::findOrFail($eventId);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'phone' => 'nullable|string|max:50',
+            'country' => 'nullable|string|max:100',
+            'employee_id' => 'nullable|string|max:100',
+            'department' => 'nullable|string|max:100',
+            'organization' => 'nullable|string|max:100',
+            'answers' => 'nullable|array',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        $participantData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'country' => $validated['country'] ?? null,
+            'employee_id' => $validated['employee_id'] ?? null,
+            'department' => $validated['department'] ?? null,
+            'organization' => $validated['organization'] ?? null,
+        ];
+
+        $result = $this->registrationService->register(
+            $event->id,
+            $participantData,
+            $validated['answers'] ?? [],
+            'manual'
+        );
+
+        $registration = $result['registration'];
+
+        if (! empty($validated['notes'])) {
+            $registration->update(['notes' => $validated['notes']]);
+        }
+
+        AuditService::log(
+            action: 'registration_manual_created',
+            entityType: 'Registration',
+            entityId: (string) $registration->id,
+            eventId: $event->id,
+            newValue: [
+                'registration_number' => $registration->registration_number,
+                'status' => $registration->status,
+                'participant_email' => $validated['email'],
+                'created_by' => $request->user()?->email,
+            ]
+        );
+
+        return response()->json([
+            'message' => $registration->status === 'confirmed'
+                ? 'Participant registered and confirmed.'
+                : ($registration->status === 'waitlisted'
+                    ? 'Participant added to the waiting list.'
+                    : 'Participant registered — pending approval.'),
+            'registration' => $registration->fresh(['participant', 'ticket', 'answers']),
+            'queue_position' => $result['queue_position'],
+            'ticket' => $result['ticket'],
+        ], 201);
+    }
+
     public function lookup(Request $request): JsonResponse
     {
         $validated = $request->validate([

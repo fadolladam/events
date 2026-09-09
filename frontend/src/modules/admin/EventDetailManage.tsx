@@ -7,6 +7,7 @@ import { WaitlistQueuePage } from '../queue/WaitlistQueuePage';
 import { AttendanceRoster } from '../attendance/AttendanceRoster';
 import { EventReportsPage } from '../reports/EventReportsPage';
 import { FormBuilderModal } from '../forms/FormBuilderModal';
+import { ManualRegistrationModal } from '../registration/ManualRegistrationModal';
 import { EventOverviewTab } from './EventOverviewTab';
 import { EventSettingsModal } from './EventSettingsModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
@@ -22,6 +23,7 @@ import {
   Settings,
   ArrowLeft,
   RefreshCw,
+  UserPlus,
   ChevronRight,
   ChevronDown,
   ChevronLeft,
@@ -60,6 +62,8 @@ export const EventDetailManage: React.FC = () => {
   const [expandedRegId, setExpandedRegId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Registration | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [showManualReg, setShowManualReg] = useState(false);
+  const [regFlash, setRegFlash] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -354,6 +358,15 @@ export const EventDetailManage: React.FC = () => {
               </span>
             </h3>
             <div className="flex items-center gap-2">
+              {canRegistrations && (
+                <button
+                  onClick={() => setShowManualReg(true)}
+                  className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-500"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add participant
+                </button>
+              )}
               <label className="text-[11px] text-slate-400">Per page</label>
               <select
                 value={regPerPage}
@@ -376,6 +389,12 @@ export const EventDetailManage: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {regFlash && (
+            <div className="border-b border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-700">
+              {regFlash}
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -567,6 +586,27 @@ export const EventDetailManage: React.FC = () => {
         onClose={closePanel}
         onSaved={(ev) => setEvent(ev)}
       />
+
+      {/* Manual (admin-side) registration */}
+      {event && (
+        <ManualRegistrationModal
+          event={event}
+          isOpen={showManualReg}
+          onClose={() => setShowManualReg(false)}
+          onCreated={(s) => {
+            const where =
+              s.status === 'confirmed'
+                ? 'confirmed'
+                : s.status === 'waitlisted'
+                  ? `on the waiting list${s.queue_position ? ` (position ${s.queue_position})` : ''}`
+                  : 'pending approval';
+            setRegFlash(`${s.registration_number} registered — ${where}.`);
+            setRegPage(1);
+            Promise.all([fetchRegistrations(eventUuid, 1, regPerPage), fetchEvent()]);
+            window.setTimeout(() => setRegFlash(null), 6000);
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={!!cancelTarget}

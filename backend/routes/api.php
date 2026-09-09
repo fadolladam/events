@@ -124,6 +124,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::middleware(ROLE_REGISTRATION)->group(function () {
         Route::get('/events/{eventId}/registrations', [RegistrationController::class, 'indexForEvent']);
+        Route::post('/events/{eventId}/registrations', [RegistrationController::class, 'storeManual'])->middleware('throttle:60,1');
         Route::get('/registrations/{id}', [RegistrationController::class, 'show']);
         Route::post('/registrations/{id}/approve', [RegistrationController::class, 'approve']);
         Route::post('/registrations/{id}/reject', [RegistrationController::class, 'reject']);

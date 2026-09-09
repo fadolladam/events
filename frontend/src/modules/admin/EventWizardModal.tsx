@@ -30,6 +30,11 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [templates, setTemplates] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
+  const [templateFormFields, setTemplateFormFields] = useState<unknown[]>([]);
+
   // Form State
   const [title, setTitle] = useState('');
   const [shortTitle, setShortTitle] = useState('');
@@ -69,8 +74,35 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       apiClient.get('/categories').then((res) => setCategories(res.data)).catch(() => {});
+      apiClient.get('/templates').then((res) => setTemplates(res.data || [])).catch(() => setTemplates([]));
     }
   }, [isOpen]);
+
+  const applyTemplate = async (id: string) => {
+    setSelectedTemplateId(id);
+    setTemplateFormFields([]);
+    if (!id) return;
+    setApplyingTemplate(true);
+    try {
+      const res = await apiClient.get(`/templates/${id}`);
+      const d = res.data?.structure?.defaults || {};
+      if (d.event_type) setEventType(d.event_type);
+      if (d.visibility) setVisibility(d.visibility);
+      if (d.capacity != null) setCapacity(Number(d.capacity));
+      if (d.waitlist_enabled != null) setWaitlistEnabled(!!d.waitlist_enabled);
+      if (d.waitlist_capacity != null) setWaitlistCapacity(Number(d.waitlist_capacity));
+      if (d.approval_mode) setApprovalMode(d.approval_mode);
+      if (d.duplicate_rule) setDuplicateRule(d.duplicate_rule);
+      if (d.allow_cancellation != null) setAllowCancellation(!!d.allow_cancellation);
+      if (d.short_description && !description) setDescription(d.short_description);
+      if (d.category_id && !categoryId) setCategoryId(Number(d.category_id));
+      setTemplateFormFields(res.data?.structure?.form_fields || []);
+    } catch {
+      setError('Could not load that template.');
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
 
   // Reset the whole wizard every time it opens. The modal is mounted once and
   // reused, so without this the date defaults stay frozen at first-render time
@@ -89,6 +121,8 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
     setCurrentStep(1);
     setError(null);
     setLoading(false);
+    setSelectedTemplateId('');
+    setTemplateFormFields([]);
     setTitle('');
     setShortTitle('');
     setEventCode('');
@@ -202,6 +236,16 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
       };
 
       const res = await apiClient.post('/events', payload);
+
+      // A template also carries its registration form — apply it to the new event.
+      if (templateFormFields.length > 0) {
+        try {
+          await apiClient.put(`/events/${res.data.id}/form`, { fields: templateFormFields });
+        } catch {
+          /* the event is created; the form just stayed on defaults */
+        }
+      }
+
       onEventCreated(res.data);
       onClose();
     } catch (err: any) {
@@ -247,6 +291,27 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
           {/* STEP 1: Basic Info */}
           {currentStep === 1 && (
             <div className="space-y-4">
+              {templates.length > 0 && (
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                    Start from a template (optional)
+                  </label>
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => applyTemplate(e.target.value)}
+                    disabled={applyingTemplate}
+                    className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs"
+                  >
+                    <option value="">— Blank event —</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[10px] text-indigo-500/80">
+                    Prefills capacity, waitlist, approval mode and the registration form. You can still change everything.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Event Title <span className="text-red-500">*</span>

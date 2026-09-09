@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
 
         // Reusable registration-form templates (idempotent, safe on every boot)
         $this->call(FormTemplateSeeder::class);
+        $this->call(EventTemplateSeeder::class);
 
         // 1. Organization
         $org = Organization::create([

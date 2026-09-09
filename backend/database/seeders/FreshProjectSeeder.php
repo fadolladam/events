@@ -32,6 +32,7 @@ class FreshProjectSeeder extends Seeder
 
         // Built-in reusable registration forms
         $this->call(FormTemplateSeeder::class);
+        $this->call(EventTemplateSeeder::class);
 
         // --- Organisation -------------------------------------------------
         $org = Organization::create([

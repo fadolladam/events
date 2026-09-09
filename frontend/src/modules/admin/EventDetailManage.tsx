@@ -175,6 +175,17 @@ export const EventDetailManage: React.FC = () => {
     }
   };
 
+  const saveAsTemplate = async () => {
+    const name = window.prompt('Name this template (e.g. "Standard CSR Run"):');
+    if (!name || !name.trim()) return;
+    try {
+      await apiClient.post(`/events/${eventUuid}/save-as-template`, { name: name.trim() });
+      alert('Saved. It now appears in the "Start from a template" list when creating an event.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Could not save the template.');
+    }
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     try {
       await apiClient.patch(`/events/${eventUuid}/status`, { status: newStatus });
@@ -326,6 +337,15 @@ export const EventDetailManage: React.FC = () => {
             <span className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold uppercase text-slate-600">
               {event.status.replace('_', ' ')}
             </span>
+          )}
+          {canManage && (
+            <button
+              onClick={saveAsTemplate}
+              className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+              title="Save this event's settings + form as a reusable template"
+            >
+              Save as template
+            </button>
           )}
         </div>
       </div>

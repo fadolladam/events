@@ -16,7 +16,13 @@ class EventController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Event::query()->with(['category', 'owner']);
+        $query = Event::query()
+            ->with(['category', 'owner'])
+            ->withCount([
+                'registrations as confirmed_count' => fn ($q) => $q->where('status', 'confirmed'),
+                'registrations as waitlist_count' => fn ($q) => $q->where('status', 'waitlisted'),
+                'checkins as checked_in_count',
+            ]);
 
         $user = $request->user();
 
@@ -56,12 +62,13 @@ class EventController extends Controller
         // Chronological: the event that happens next sits at the top.
         $events = $query->orderBy('start_at', 'asc')->orderBy('end_at', 'asc')->paginate($perPage);
 
-        // Append counts
+        // confirmed_count / waitlist_count / checked_in_count come from withCount
+        // (one query, no N+1). dynamic_status is derived from those + dates.
         $events->getCollection()->transform(function ($event) {
-            $event->confirmed_count = $event->confirmedRegistrations()->count();
-            $event->waitlist_count = $event->waitlistedRegistrations()->count();
-            $event->checked_in_count = $event->checkins()->count();
-            $event->dynamic_status = $event->calculateDynamicStatus();
+            $event->dynamic_status = $event->calculateDynamicStatus(
+                (int) $event->confirmed_count,
+                (int) $event->waitlist_count,
+            );
 
             return $event;
         });
@@ -74,7 +81,11 @@ class EventController extends Controller
         $query = Event::query()
             ->whereIn('visibility', ['public', 'hidden_link'])
             ->whereNotIn('status', ['draft', 'archived'])
-            ->with(['category']);
+            ->with(['category'])
+            ->withCount([
+                'registrations as confirmed_count' => fn ($q) => $q->where('status', 'confirmed'),
+                'registrations as waitlist_count' => fn ($q) => $q->where('status', 'waitlisted'),
+            ]);
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->input('category_id'));
@@ -93,9 +104,10 @@ class EventController extends Controller
         $events = $query->orderBy('start_at', 'asc')->paginate(12);
 
         $events->getCollection()->transform(function ($event) {
-            $event->confirmed_count = $event->confirmedRegistrations()->count();
-            $event->waitlist_count = $event->waitlistedRegistrations()->count();
-            $event->dynamic_status = $event->calculateDynamicStatus();
+            $event->dynamic_status = $event->calculateDynamicStatus(
+                (int) $event->confirmed_count,
+                (int) $event->waitlist_count,
+            );
 
             return $event;
         });

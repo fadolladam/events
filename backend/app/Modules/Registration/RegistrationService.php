@@ -9,6 +9,7 @@ use App\Models\RegistrationAnswer;
 use App\Models\RegistrationStatusHistory;
 use App\Models\WaitlistHistory;
 use App\Modules\Audit\AuditService;
+use App\Modules\Forms\ConditionalLogic;
 use App\Modules\Tickets\TicketService;
 use App\Modules\Waitlist\WaitlistService;
 use Illuminate\Support\Facades\DB;
@@ -373,9 +374,21 @@ class RegistrationService
         $coreKeys = ['full_name', 'email', 'phone'];
         $errors = [];
 
+        // Flat map of submitted values for conditional-logic evaluation.
+        $values = [];
+        foreach ($formAnswers as $key => $entry) {
+            $values[$key] = is_array($entry) ? ($entry['value'] ?? null) : $entry;
+        }
+
         foreach ($form->fields as $field) {
             // "info" is display-only — it never carries an answer.
             if ($field->is_hidden || $field->type === 'info' || in_array($field->field_key, $coreKeys, true)) {
+                continue;
+            }
+
+            // A field hidden by its show-condition is not validated at all
+            // (otherwise a required-but-hidden field would block submission).
+            if (! ConditionalLogic::passes($field->conditional_logic, $values)) {
                 continue;
             }
 

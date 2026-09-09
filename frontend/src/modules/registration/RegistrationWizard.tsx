@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient, ensureCsrf, EventItem, Registration } from '../../services/api';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, Clock, Ticket, ArrowLeft, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { fieldConditionPasses, type FieldCondition } from '../forms/conditionalLogic';
 
 interface RegistrationWizardProps {
   event: EventItem;
@@ -60,7 +61,25 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
     ticket_token?: string | null;
   } | null>(null);
 
-  const formFields = fullEvent.form?.fields || [];
+  const formFields = useMemo(() => fullEvent.form?.fields || [], [fullEvent.form]);
+
+  // Resolved answer values keyed by field_key, for conditional-logic checks.
+  const answerValues = useMemo(() => {
+    const v: Record<string, unknown> = {};
+    for (const [k, entry] of Object.entries(customAnswers)) v[k] = entry.value;
+    return v;
+  }, [customAnswers]);
+
+  const visibleCustomFields = useMemo(
+    () =>
+      formFields.filter(
+        (f) =>
+          !['full_name', 'email', 'phone'].includes(f.field_key) &&
+          !f.is_hidden &&
+          fieldConditionPasses(f.conditional_logic as FieldCondition | undefined, answerValues),
+      ),
+    [formFields, answerValues],
+  );
 
   const handleCustomFieldChange = (fieldKey: string, fieldLabel: string, value: any) => {
     setCustomAnswers((prev) => ({
@@ -95,7 +114,12 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
         phone,
         employee_id: employeeId || undefined,
         department: department || undefined,
-        answers: customAnswers,
+        // Only submit answers for fields that are currently visible.
+        answers: Object.fromEntries(
+          visibleCustomFields
+            .map((f) => [f.field_key, customAnswers[f.field_key]] as const)
+            .filter(([, entry]) => entry !== undefined),
+        ),
         source: 'web_portal',
       };
 
@@ -213,7 +237,7 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
               </div>
 
               {/* Dynamic Event Form Fields */}
-              {formFields.filter((f) => !['full_name', 'email', 'phone'].includes(f.field_key) && !f.is_hidden).map((f) =>
+              {visibleCustomFields.map((f) =>
                 f.type === 'info' ? (
                   <p key={f.field_key} className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">{f.label}</p>
                 ) : (

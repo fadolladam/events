@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient, EventItem, FormField } from '../../services/api';
 import { X, UserPlus, Loader2 } from 'lucide-react';
+import { fieldConditionPasses, type FieldCondition } from '../forms/conditionalLogic';
 
 interface ParticipantHit {
   id: string;
@@ -44,9 +45,21 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
   const [pickedExisting, setPickedExisting] = useState(false);
   const [showSuggest, setShowSuggest] = useState(false);
 
+  const answerValues = useMemo(() => {
+    const v: Record<string, unknown> = {};
+    for (const [k, entry] of Object.entries(answers)) v[k] = entry.value;
+    return v;
+  }, [answers]);
+
   const dynamicFields = useMemo<FormField[]>(
-    () => (event.form?.fields || []).filter((f) => !CORE_KEYS.includes(f.field_key) && !f.is_hidden),
-    [event.form],
+    () =>
+      (event.form?.fields || []).filter(
+        (f) =>
+          !CORE_KEYS.includes(f.field_key) &&
+          !f.is_hidden &&
+          fieldConditionPasses(f.conditional_logic as FieldCondition | undefined, answerValues),
+      ),
+    [event.form, answerValues],
   );
 
   // Type-ahead against the participant directory.
@@ -107,7 +120,11 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
         employee_id: employeeId.trim() || null,
         department: department.trim() || null,
         notes: notes.trim() || null,
-        answers,
+        answers: Object.fromEntries(
+          dynamicFields
+            .map((f) => [f.field_key, answers[f.field_key]] as const)
+            .filter(([, entry]) => entry !== undefined),
+        ),
       });
       const reg = res.data.registration;
       reset();

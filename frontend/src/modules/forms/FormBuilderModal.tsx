@@ -360,6 +360,68 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
                       <span>Required Field</span>
                     </label>
                   </div>
+
+                  {/* Conditional visibility (#24) */}
+                  {!isLocked && i > 0 && (() => {
+                    const choiceSources = fields
+                      .slice(0, i)
+                      .filter((s) => ['select', 'radio', 'checkbox', 'multi_select'].includes(s.type) && (s.options || []).length > 0);
+                    const cond = f.conditional_logic || null;
+                    if (choiceSources.length === 0) return null;
+                    const src = choiceSources.find((s) => s.field_key === cond?.field);
+                    return (
+                      <div className="pt-2 border-t border-slate-100 text-xs space-y-2">
+                        <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!cond?.field}
+                            onChange={(e) =>
+                              updateField(i, {
+                                conditional_logic: e.target.checked
+                                  ? { field: choiceSources[0].field_key, operator: 'equals', value: (choiceSources[0].options || [])[0] || '' }
+                                  : null,
+                              })
+                            }
+                            className="rounded text-indigo-600"
+                          />
+                          <span>Only show this field when…</span>
+                        </label>
+                        {cond?.field && (
+                          <div className="flex flex-wrap items-center gap-1.5 pl-5">
+                            <select
+                              value={cond.field}
+                              onChange={(e) => {
+                                const ns = choiceSources.find((s) => s.field_key === e.target.value);
+                                updateField(i, { conditional_logic: { ...cond, field: e.target.value, value: (ns?.options || [])[0] || '' } });
+                              }}
+                              className="px-2 py-1 rounded-lg border border-slate-300 bg-white"
+                            >
+                              {choiceSources.map((s) => (
+                                <option key={s.field_key} value={s.field_key}>{s.label}</option>
+                              ))}
+                            </select>
+                            <select
+                              value={cond.operator || 'equals'}
+                              onChange={(e) => updateField(i, { conditional_logic: { ...cond, operator: e.target.value } })}
+                              className="px-2 py-1 rounded-lg border border-slate-300 bg-white"
+                            >
+                              <option value="equals">is</option>
+                              <option value="not_equals">is not</option>
+                            </select>
+                            <select
+                              value={Array.isArray(cond.value) ? cond.value[0] : cond.value || ''}
+                              onChange={(e) => updateField(i, { conditional_logic: { ...cond, value: e.target.value } })}
+                              className="px-2 py-1 rounded-lg border border-slate-300 bg-white"
+                            >
+                              {(src?.options || []).map((o) => (
+                                <option key={o} value={o}>{o}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })

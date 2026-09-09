@@ -230,6 +230,9 @@ export interface EventItem {
   waitlist_count?: number;
   pending_count?: number;
   checked_in_count?: number;
+  available_seats?: number;
+  over_capacity?: boolean;
+  utilisation_pct?: number;
   waitlist_enabled: boolean;
   waitlist_capacity?: number;
   approval_mode: string;

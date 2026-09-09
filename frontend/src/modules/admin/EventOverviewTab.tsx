@@ -104,6 +104,14 @@ export const EventOverviewTab: React.FC<Props> = ({ eventId, event, role, onOpen
 
   return (
     <div className="space-y-6">
+      {data.confirmed > data.capacity && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <span className="font-bold">Over capacity.</span> {data.confirmed} confirmed against a capacity of{' '}
+          {data.capacity}. Confirmed registrations are never dropped automatically; new sign-ups go to the
+          waiting list until confirmed falls back within capacity.
+        </div>
+      )}
+
       {/* §32 KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
         <StatTile label="Capacity" value={fmtInt(data.capacity)} />

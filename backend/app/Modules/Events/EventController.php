@@ -125,6 +125,14 @@ class EventController extends Controller
         $event->checked_in_count = $event->checkins()->count();
         $event->dynamic_status = $event->calculateDynamicStatus();
 
+        // Capacity snapshot for the console (avoids the UI re-deriving it).
+        $capacity = (int) $event->capacity;
+        $event->available_seats = max(0, $capacity - $event->confirmed_count);
+        $event->over_capacity = $event->confirmed_count > $capacity;
+        $event->utilisation_pct = $capacity > 0
+            ? (int) round(min(100, $event->confirmed_count / $capacity * 100))
+            : 0;
+
         return response()->json($event);
     }
 

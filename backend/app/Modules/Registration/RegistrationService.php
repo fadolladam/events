@@ -192,6 +192,108 @@ class RegistrationService
     }
 
     /**
+     * Approve a pending registration. Confirms it if a seat is free, otherwise
+     * drops it onto the waitlist. Shared by the single + bulk endpoints.
+     */
+    public function approveRegistration(Registration $registration): Registration
+    {
+        return DB::transaction(function () use ($registration) {
+            $registration = Registration::where('id', $registration->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($registration->status, ['pending', 'rejected'], true)) {
+                return $registration;
+            }
+
+            $event = $registration->event;
+            $confirmedCount = Registration::where('event_id', $event->id)
+                ->where('status', 'confirmed')
+                ->lockForUpdate()
+                ->count();
+
+            $target = $confirmedCount < $event->capacity ? 'confirmed' : 'waitlisted';
+            $from = $registration->status;
+
+            $registration->update([
+                'status' => $target,
+                'approved_at' => now(),
+                'confirmed_at' => $target === 'confirmed' ? now() : null,
+                'waitlisted_at' => $target === 'waitlisted' ? now() : null,
+            ]);
+
+            RegistrationStatusHistory::create([
+                'registration_id' => $registration->id,
+                'event_id' => $event->id,
+                'from_status' => $from,
+                'to_status' => $target,
+                'reason' => 'Approved by administrator.',
+                'created_at' => now(),
+            ]);
+
+            if ($target === 'confirmed') {
+                $this->ticketService->issueTicket($registration);
+            }
+
+            AuditService::log(
+                action: 'registration_approved',
+                entityType: 'Registration',
+                entityId: (string) $registration->id,
+                eventId: $event->id,
+                previousValue: ['status' => $from],
+                newValue: ['status' => $target],
+            );
+
+            return $registration->fresh(['participant', 'ticket']);
+        });
+    }
+
+    /**
+     * Reject a registration. If it held a confirmed seat, the freed seat
+     * triggers waitlist promotion.
+     */
+    public function rejectRegistration(Registration $registration, string $reason = 'Administrative rejection'): Registration
+    {
+        return DB::transaction(function () use ($registration, $reason) {
+            $registration = Registration::where('id', $registration->id)->lockForUpdate()->firstOrFail();
+            $from = $registration->status;
+
+            if ($from === 'rejected') {
+                return $registration;
+            }
+
+            $registration->update(['status' => 'rejected', 'rejected_at' => now()]);
+
+            RegistrationStatusHistory::create([
+                'registration_id' => $registration->id,
+                'event_id' => $registration->event_id,
+                'from_status' => $from,
+                'to_status' => 'rejected',
+                'reason' => $reason,
+                'created_at' => now(),
+            ]);
+
+            $ticket = $registration->ticket()->first();
+            if ($ticket && $ticket->status === 'active') {
+                $this->ticketService->revokeTicket($ticket, 'Registration rejected: '.$reason);
+            }
+
+            AuditService::log(
+                action: 'registration_rejected',
+                entityType: 'Registration',
+                entityId: (string) $registration->id,
+                eventId: $registration->event_id,
+                previousValue: ['status' => $from],
+                newValue: ['status' => 'rejected', 'reason' => $reason],
+            );
+
+            if ($from === 'confirmed') {
+                $this->waitlistService->promoteWaitlistedParticipants($registration->event_id);
+            }
+
+            return $registration->fresh(['participant']);
+        });
+    }
+
+    /**
      * Cancel a registration (by participant or admin).
      * Automatically promotes the next waitlisted person in FIFO order.
      */

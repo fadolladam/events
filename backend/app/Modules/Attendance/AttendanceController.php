@@ -72,4 +72,44 @@ class AttendanceController extends Controller
             'registration' => $registration->fresh(['participant', 'attendance']),
         ]);
     }
+
+    /** Set the same attendance status on many registrations at once. */
+    public function bulkMark(Request $request, string $eventId): JsonResponse
+    {
+        Event::findOrFail($eventId);
+
+        $validated = $request->validate([
+            'registration_ids' => 'required|array|min:1|max:1000',
+            'registration_ids.*' => 'uuid',
+            'status' => 'required|string|in:not_checked_in,checked_in,attended,no_show',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $rows = Registration::where('event_id', $eventId)
+            ->whereIn('id', $validated['registration_ids'])
+            ->get();
+
+        foreach ($rows as $registration) {
+            $registration->update(['attendance_status' => $validated['status']]);
+            Attendance::updateOrCreate(
+                ['registration_id' => $registration->id],
+                [
+                    'event_id' => $eventId,
+                    'status' => $validated['status'],
+                    'notes' => $validated['notes'] ?? null,
+                    'updated_by_user_id' => $request->user()?->id,
+                ]
+            );
+        }
+
+        AuditService::log(
+            action: 'attendance_bulk_updated',
+            entityType: 'Event',
+            entityId: (string) $eventId,
+            eventId: $eventId,
+            newValue: ['status' => $validated['status'], 'count' => $rows->count()],
+        );
+
+        return response()->json(['processed' => $rows->count(), 'status' => $validated['status']]);
+    }
 }

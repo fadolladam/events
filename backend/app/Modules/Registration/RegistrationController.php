@@ -201,6 +201,24 @@ class RegistrationController extends Controller
             $query->where('attendance_status', $request->input('attendance_status'));
         }
 
+        // checked_in shortcut: "yes" -> checked_in, "no" -> not yet
+        if ($request->filled('checked_in')) {
+            $yes = filter_var($request->input('checked_in'), FILTER_VALIDATE_BOOL);
+            $query->where('attendance_status', $yes ? '=' : '!=', 'checked_in');
+        }
+
+        if ($request->filled('department')) {
+            $dept = $request->input('department');
+            $query->whereHas('participant', fn ($q) => $q->where('department', 'like', "%{$dept}%"));
+        }
+
+        if ($request->filled('date_from')) {
+            $query->where('registered_at', '>=', $request->date('date_from')->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $query->where('registered_at', '<=', $request->date('date_to')->endOfDay());
+        }
+
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
@@ -250,53 +268,114 @@ class RegistrationController extends Controller
 
     public function approve(string $id): JsonResponse
     {
-        $registration = Registration::findOrFail($id);
-        $event = $registration->event;
+        $registration = $this->registrationService->approveRegistration(Registration::findOrFail($id));
 
-        $confirmedCount = Registration::where('event_id', $event->id)->where('status', 'confirmed')->count();
-        $targetStatus = ($confirmedCount < $event->capacity) ? 'confirmed' : 'waitlisted';
-
-        $registration->update([
-            'status' => $targetStatus,
-            'approved_at' => now(),
-            'confirmed_at' => $targetStatus === 'confirmed' ? now() : null,
-            'waitlisted_at' => $targetStatus === 'waitlisted' ? now() : null,
-        ]);
-
-        if ($targetStatus === 'confirmed') {
-            $this->ticketService->issueTicket($registration);
-        }
-
-        AuditService::log(
-            action: 'registration_approved',
-            entityType: 'Registration',
-            entityId: (string) $registration->id,
-            eventId: $event->id,
-            newValue: ['status' => $targetStatus]
-        );
-
-        return response()->json($registration->fresh(['participant', 'ticket']));
+        return response()->json($registration);
     }
 
     public function reject(Request $request, string $id): JsonResponse
     {
-        $registration = Registration::findOrFail($id);
-        $reason = $request->input('reason', 'Administrative rejection');
+        $registration = $this->registrationService->rejectRegistration(
+            Registration::findOrFail($id),
+            $request->input('reason', 'Administrative rejection'),
+        );
 
-        $registration->update([
-            'status' => 'rejected',
-            'rejected_at' => now(),
+        return response()->json($registration);
+    }
+
+    /**
+     * Bulk approve / reject / cancel over a set of registration ids for one
+     * event. Each id runs through the same service method as the single-row
+     * action; unknown or out-of-event ids are reported, not fatal.
+     */
+    public function bulk(Request $request, string $eventId): JsonResponse
+    {
+        $event = Event::findOrFail($eventId);
+        $validated = $request->validate([
+            'action' => 'required|string|in:approve,reject,cancel',
+            'ids' => 'required|array|min:1|max:500',
+            'ids.*' => 'string',
+            'reason' => 'nullable|string|max:500',
         ]);
 
+        $rows = Registration::where('event_id', $event->id)->whereIn('id', $validated['ids'])->get();
+        $found = $rows->pluck('id')->all();
+        $skipped = collect($validated['ids'])->diff($found)
+            ->map(fn ($id) => ['id' => $id, 'reason' => 'not found for this event'])
+            ->values()
+            ->all();
+
+        $processed = 0;
+        foreach ($rows as $reg) {
+            try {
+                match ($validated['action']) {
+                    'approve' => $this->registrationService->approveRegistration($reg),
+                    'reject' => $this->registrationService->rejectRegistration($reg, $validated['reason'] ?? 'Bulk rejection'),
+                    'cancel' => $this->registrationService->cancelRegistration($reg, $validated['reason'] ?? 'Bulk cancellation by administrator'),
+                };
+                $processed++;
+            } catch (\Throwable $e) {
+                $skipped[] = ['id' => $reg->id, 'reason' => $e->getMessage()];
+            }
+        }
+
         AuditService::log(
-            action: 'registration_rejected',
+            action: 'registrations_bulk_'.$validated['action'],
+            entityType: 'Event',
+            entityId: (string) $event->id,
+            eventId: $event->id,
+            newValue: ['requested' => count($validated['ids']), 'processed' => $processed, 'skipped' => count($skipped)],
+        );
+
+        return response()->json(['processed' => $processed, 'skipped' => $skipped]);
+    }
+
+    /**
+     * Revoke the current ticket and issue a fresh one (e.g. the old QR leaked).
+     * Only meaningful for a confirmed registration.
+     */
+    public function reissueTicket(string $id): JsonResponse
+    {
+        $registration = Registration::findOrFail($id);
+
+        if ($registration->status !== 'confirmed') {
+            return response()->json(['message' => 'Only a confirmed registration has a ticket.'], 422);
+        }
+
+        $old = $registration->ticket()->first();
+        if ($old && $old->status === 'active') {
+            $this->ticketService->revokeTicket($old, 'Reissued by administrator');
+        }
+        $old?->delete();
+
+        $ticket = $this->ticketService->issueTicket($registration->fresh());
+
+        AuditService::log(
+            action: 'ticket_reissued',
             entityType: 'Registration',
             entityId: (string) $registration->id,
             eventId: $registration->event_id,
-            newValue: ['reason' => $reason]
         );
 
-        return response()->json($registration->fresh());
+        return response()->json(['ticket' => $ticket]);
+    }
+
+    /** Edit the internal note on a registration. */
+    public function updateNotes(Request $request, string $id): JsonResponse
+    {
+        $registration = Registration::findOrFail($id);
+        $validated = $request->validate(['notes' => 'nullable|string|max:2000']);
+
+        $registration->update(['notes' => $validated['notes']]);
+
+        AuditService::log(
+            action: 'registration_notes_updated',
+            entityType: 'Registration',
+            entityId: (string) $registration->id,
+            eventId: $registration->event_id,
+        );
+
+        return response()->json($registration->fresh(['participant']));
     }
 
     public function cancelByAdmin(Request $request, string $id): JsonResponse

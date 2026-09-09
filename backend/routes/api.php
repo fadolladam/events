@@ -126,10 +126,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware([ROLE_REGISTRATION, 'event.scope'])->group(function () {
         Route::get('/events/{eventId}/registrations', [RegistrationController::class, 'indexForEvent']);
         Route::post('/events/{eventId}/registrations', [RegistrationController::class, 'storeManual'])->middleware('throttle:60,1');
+        Route::post('/events/{eventId}/registrations/bulk', [RegistrationController::class, 'bulk'])->middleware('throttle:30,1');
         Route::get('/registrations/{id}', [RegistrationController::class, 'show']);
+        Route::patch('/registrations/{id}', [RegistrationController::class, 'updateNotes']);
         Route::post('/registrations/{id}/approve', [RegistrationController::class, 'approve']);
         Route::post('/registrations/{id}/reject', [RegistrationController::class, 'reject']);
         Route::post('/registrations/{id}/cancel', [RegistrationController::class, 'cancelByAdmin']);
+        Route::post('/registrations/{id}/reissue-ticket', [RegistrationController::class, 'reissueTicket']);
 
         Route::get('/events/{eventId}/waitlist', [WaitlistController::class, 'indexForEvent']);
         Route::get('/events/{eventId}/waitlist/history', [WaitlistController::class, 'history']);
@@ -150,6 +153,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/events/{eventId}/attendance', [AttendanceController::class, 'index']);
         Route::post('/events/{eventId}/attendance/mark', [AttendanceController::class, 'markAttendance']);
+        Route::post('/events/{eventId}/attendance/bulk', [AttendanceController::class, 'bulkMark'])->middleware('throttle:30,1');
     });
 
     /*

@@ -53,7 +53,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
 | **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
-| **2 Core** | #20, #22, #23 | #18, #28 | #19, #21, #24, #25, #26, #27, #29, #30 |
+| **2 Core** | #20, #22, #23, #29, #30 | #18, #23(file), #28 | #19, #21, #24, #25, #26, #27 |
 | 3 Admin/Dash | #27-adjacent | #42, #43 | #31–#41 (#40 ❌) |
 | 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
 | 5 Housekeeping | #56 | — | #57, #58 |
@@ -222,16 +222,19 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   moves → 422. Covered by `EventStatusTransitionTest`. STILL OPEN: reconcile the
   stored `status` with `calculateDynamicStatus()` so catalogue / detail /
   dashboard / reports never disagree. _E§21_
-- ☐ **29. Capacity visibility & over-capacity handling** — show capacity /
-  confirmed / pending / waitlisted / available / utilisation %; explicit
-  over-capacity warning; block new confirmations while over capacity; never
-  auto-cancel confirmed. _E§22_
+- ✅ **29. Capacity visibility & over-capacity handling** — Overview tab already
+  showed the capacity/confirmed/pending/waitlisted/available KPI row +
+  utilisation bar; added an explicit over-capacity warning banner and
+  `available_seats` / `over_capacity` / `utilisation_pct` on `GET /events/{id}`.
+  New confirmations already queue while over capacity, confirmed rows are never
+  auto-dropped (`RegistrationService`). `EventCapacitySnapshotTest`. _E§22_
 
 ### On-site
-- ☐ **30. Check-in UI states** — large visual SUCCESS / DUPLICATE / INVALID /
-  REVOKED / WRONG EVENT / CANCELLED / NOT ELIGIBLE; rich participant panel
-  (name, employee ID, reg #, department, event, time, gate, status). Keep
-  duplicate detection + undo. _E§25_
+- ✅ **30. Check-in UI states** — `QrScannerConsole` resolves each scan to
+  SUCCESS / DUPLICATE / INVALID / REVOKED / WRONG EVENT / CANCELLED /
+  NOT ELIGIBLE as a large colour-coded card with a participant panel (name,
+  reg #, employee ID, department) + time; backend messages mapped client-side.
+  Duplicate detection + undo unchanged. _E§25_
 
 ---
 

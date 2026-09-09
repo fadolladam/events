@@ -229,6 +229,12 @@ class RegistrationService
                 ]);
             }
 
+            // A cancelled seat's QR ticket must not stay scannable.
+            $ticket = $registration->ticket()->first();
+            if ($ticket && $ticket->status === 'active') {
+                $this->ticketService->revokeTicket($ticket, 'Registration cancelled: '.$reason);
+            }
+
             AuditService::log(
                 action: 'registration_cancelled',
                 entityType: 'Registration',

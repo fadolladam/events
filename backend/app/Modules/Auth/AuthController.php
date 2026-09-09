@@ -8,12 +8,20 @@ use App\Modules\Audit\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     public function __construct(
         protected AuthService $authService
     ) {}
+
+    /** Failed attempts before a per-account/IP lockout, and the lockout window. */
+    private const LOGIN_MAX_ATTEMPTS = 5;
+
+    private const LOGIN_DECAY_SECONDS = 900;
 
     public function login(Request $request): JsonResponse
     {
@@ -22,7 +30,32 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $result = $this->authService->login($validated['email'], $validated['password']);
+        $throttleKey = 'login:'.Str::lower($validated['email']).'|'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, self::LOGIN_MAX_ATTEMPTS)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            AuditService::log(
+                action: 'user_login_locked_out',
+                entityType: 'User',
+                newValue: ['email' => $validated['email'], 'retry_after' => $seconds],
+            );
+
+            throw ValidationException::withMessages([
+                'email' => ['Too many failed attempts. Try again in '.ceil($seconds / 60).' minute(s).'],
+            ])->status(429);
+        }
+
+        try {
+            $result = $this->authService->login($validated['email'], $validated['password']);
+        } catch (ValidationException $e) {
+            // Count the failure; the limiter's own decay gives the backoff.
+            RateLimiter::hit($throttleKey, self::LOGIN_DECAY_SECONDS);
+
+            throw $e;
+        }
+
+        RateLimiter::clear($throttleKey);
 
         return response()->json([
             'message' => 'Login successful',

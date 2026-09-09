@@ -264,12 +264,19 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
                         className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
                       >
                         <option value="text">Single-line Text</option>
+                        <option value="textarea">Paragraph Text</option>
                         <option value="email">Email Address</option>
                         <option value="phone">Phone Number</option>
+                        <option value="employee_id">Employee ID</option>
                         <option value="number">Numeric</option>
+                        <option value="date">Date</option>
+                        <option value="time">Time</option>
                         <option value="select">Dropdown Select</option>
                         <option value="radio">Radio Buttons</option>
-                        <option value="checkbox">Checkbox</option>
+                        <option value="checkbox">Checkboxes (multi)</option>
+                        <option value="multi_select">Multi-select list</option>
+                        <option value="consent">Consent checkbox</option>
+                        <option value="info">Info text (display only)</option>
                       </select>
                     </div>
 
@@ -301,7 +308,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
                   </div>
 
                   {/* Options editor for select/radio/checkbox */}
-                  {['select', 'radio', 'checkbox'].includes(f.type) && (
+                  {['select', 'radio', 'checkbox', 'multi_select'].includes(f.type) && (
                     <div className="pt-2 border-t border-slate-100 text-xs">
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                         Choices — one per line (e.g. jersey sizes)

@@ -374,12 +374,23 @@ class RegistrationService
         $errors = [];
 
         foreach ($form->fields as $field) {
-            if ($field->is_hidden || in_array($field->field_key, $coreKeys, true)) {
+            // "info" is display-only — it never carries an answer.
+            if ($field->is_hidden || $field->type === 'info' || in_array($field->field_key, $coreKeys, true)) {
                 continue;
             }
 
             $answer = $formAnswers[$field->field_key]['value'] ?? null;
-            $isEmpty = $answer === null || $answer === '' || (is_array($answer) && count($answer) === 0);
+            $isEmpty = $answer === null || $answer === '' || $answer === false
+                || (is_array($answer) && count($answer) === 0);
+
+            // A required consent must be affirmatively ticked.
+            if ($field->type === 'consent') {
+                if ($field->is_required && ! filter_var($answer, FILTER_VALIDATE_BOOL)) {
+                    $errors[$field->field_key] = ["You must accept \"{$field->label}\" to continue."];
+                }
+
+                continue;
+            }
 
             if ($field->is_required && $isEmpty) {
                 $errors[$field->field_key] = ["{$field->label} is required."];
@@ -392,12 +403,24 @@ class RegistrationService
             }
 
             // Constrain choice fields to their configured options.
-            if (in_array($field->type, ['select', 'radio', 'checkbox'], true) && ! empty($field->options)) {
+            if (in_array($field->type, ['select', 'radio', 'checkbox', 'multi_select'], true) && ! empty($field->options)) {
                 $submitted = is_array($answer) ? $answer : [$answer];
                 $invalid = array_diff($submitted, $field->options);
                 if (! empty($invalid)) {
                     $errors[$field->field_key] = ["\"{$field->label}\" has an invalid selection."];
                 }
+            }
+
+            if ($field->type === 'date' && strtotime((string) $answer) === false) {
+                $errors[$field->field_key] = ["\"{$field->label}\" is not a valid date."];
+            }
+
+            if ($field->type === 'time' && ! preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string) $answer)) {
+                $errors[$field->field_key] = ["\"{$field->label}\" is not a valid time (HH:MM)."];
+            }
+
+            if ($field->type === 'number' && ! is_numeric($answer)) {
+                $errors[$field->field_key] = ["\"{$field->label}\" must be a number."];
             }
         }
 

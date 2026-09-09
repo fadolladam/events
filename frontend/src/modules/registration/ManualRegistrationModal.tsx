@@ -152,7 +152,12 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
 
           {dynamicFields.length > 0 && (
             <div className="space-y-4 border-t border-slate-100 pt-4">
-              {dynamicFields.map((f) => (
+              {dynamicFields.map((f) =>
+                f.type === 'info' ? (
+                  <p key={f.field_key} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    {f.label}
+                  </p>
+                ) : (
                 <Field key={f.field_key} label={f.label} required={f.is_required} error={fieldErrors[f.field_key]} help={f.help_text}>
                   {f.type === 'select' ? (
                     <select
@@ -180,7 +185,7 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
                         </label>
                       ))}
                     </div>
-                  ) : f.type === 'checkbox' && (f.options || []).length > 0 ? (
+                  ) : (f.type === 'checkbox' || f.type === 'multi_select') && (f.options || []).length > 0 ? (
                     <div className="mt-1 space-y-1.5">
                       {(f.options || []).map((o) => {
                         const sel: string[] = Array.isArray(answers[f.field_key]?.value) ? answers[f.field_key].value : [];
@@ -198,15 +203,25 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
                         );
                       })}
                     </div>
-                  ) : f.type === 'checkbox' ? (
+                  ) : f.type === 'checkbox' || f.type === 'consent' ? (
                     <label className="mt-1 flex cursor-pointer items-center gap-2 text-xs text-slate-700">
                       <input
                         type="checkbox"
+                        required={f.type === 'consent' && f.is_required}
                         checked={answers[f.field_key]?.value === true}
                         onChange={(e) => setAnswer(f.field_key, f.label, e.target.checked)}
                       />
-                      <span>{f.placeholder || 'Yes'}</span>
+                      <span>{f.placeholder || (f.type === 'consent' ? 'I agree' : 'Yes')}</span>
                     </label>
+                  ) : f.type === 'textarea' ? (
+                    <textarea
+                      required={f.is_required}
+                      rows={3}
+                      placeholder={f.placeholder || ''}
+                      value={answers[f.field_key]?.value || ''}
+                      onChange={(e) => setAnswer(f.field_key, f.label, e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
                   ) : (
                     <input
                       type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text'}
@@ -218,7 +233,8 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
                     />
                   )}
                 </Field>
-              ))}
+              ),
+              )}
             </div>
           )}
 

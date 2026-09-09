@@ -213,7 +213,10 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
               </div>
 
               {/* Dynamic Event Form Fields */}
-              {formFields.filter((f) => !['full_name', 'email', 'phone'].includes(f.field_key) && !f.is_hidden).map((f) => (
+              {formFields.filter((f) => !['full_name', 'email', 'phone'].includes(f.field_key) && !f.is_hidden).map((f) =>
+                f.type === 'info' ? (
+                  <p key={f.field_key} className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">{f.label}</p>
+                ) : (
                 <div key={f.field_key}>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     {f.label} {f.is_required && <span className="text-red-500">*</span>}
@@ -248,7 +251,7 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
                         </label>
                       ))}
                     </div>
-                  ) : f.type === 'checkbox' && (f.options || []).length > 0 ? (
+                  ) : (f.type === 'checkbox' || f.type === 'multi_select') && (f.options || []).length > 0 ? (
                     <div className="space-y-2 mt-1">
                       {(f.options || []).map((opt) => {
                         const selected: string[] = Array.isArray(customAnswers[f.field_key]?.value)
@@ -272,19 +275,29 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
                         );
                       })}
                     </div>
-                  ) : f.type === 'checkbox' ? (
+                  ) : f.type === 'checkbox' || f.type === 'consent' ? (
                     <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer mt-1">
                       <input
                         type="checkbox"
+                        required={f.type === 'consent' && f.is_required}
                         checked={customAnswers[f.field_key]?.value === true}
                         onChange={(e) => handleCustomFieldChange(f.field_key, f.label, e.target.checked)}
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span>{f.placeholder || 'Yes'}</span>
+                      <span>{f.placeholder || (f.type === 'consent' ? 'I agree' : 'Yes')}</span>
                     </label>
+                  ) : f.type === 'textarea' ? (
+                    <textarea
+                      required={f.is_required}
+                      rows={3}
+                      placeholder={f.placeholder || ''}
+                      value={customAnswers[f.field_key]?.value || ''}
+                      onChange={(e) => handleCustomFieldChange(f.field_key, f.label, e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    />
                   ) : (
                     <input
-                      type={f.type === 'number' ? 'number' : 'text'}
+                      type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text'}
                       required={f.is_required}
                       placeholder={f.placeholder || ''}
                       value={customAnswers[f.field_key]?.value || ''}
@@ -294,7 +307,8 @@ export const RegistrationWizard: React.FC<RegistrationWizardProps> = ({
                   )}
                   {f.help_text && <p className="text-[11px] text-slate-400 mt-1">{f.help_text}</p>}
                 </div>
-              ))}
+              ),
+              )}
 
               <button
                 type="submit"

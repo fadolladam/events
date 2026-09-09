@@ -35,7 +35,7 @@ class FormBuilderController extends Controller
             'fields' => 'required|array|min:1',
             'fields.*.field_key' => 'required|string',
             'fields.*.label' => 'required|string',
-            'fields.*.type' => 'required|string',
+            'fields.*.type' => 'required|string|in:text,textarea,email,phone,employee_id,number,date,time,select,radio,checkbox,multi_select,consent,info',
             'fields.*.placeholder' => 'nullable|string',
             'fields.*.help_text' => 'nullable|string',
             'fields.*.is_required' => 'boolean',

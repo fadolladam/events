@@ -48,6 +48,10 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #30 Check-in states | ✅ `QrScannerConsole` shows SUCCESS/DUPLICATE/INVALID/REVOKED/WRONG EVENT/CANCELLED/NOT ELIGIBLE as a large card + participant panel; backend messages mapped client-side. |
 | 2026-09-09 | #21 CSV import | ✅ `RegistrationImportService` shared by the artisan command + `POST /events/{id}/registrations/import` (dry-run, 2000-row cap, audited); `RegistrationImportModal`. `RegistrationImportTest`. |
 | 2026-09-09 | #19 Participant directory | ✅ `GET /participants` + `/lookup` + `/{id}`; `/admin/participants` page + drawer + nav; manual-reg autocomplete. `ParticipantDirectoryTest`. Suite: 69. |
+| 2026-09-09 | #24 Conditional form logic | ✅ `ConditionalLogic` (PHP + TS); builder UI + wizard/manual-reg live hide + server skip of hidden fields. `ConditionalFieldLogicTest`. |
+| 2026-09-09 | #25 Form-builder UX | ✅ drag/drop reorder, live preview, duplicate-key guard (client + `distinct:ignore_case`). `FormBuilderGuardTest`. |
+| 2026-09-09 | #26 Event templates | ✅ 8-template `EventTemplateSeeder`; `GET /templates/{id}` + `POST /events/{id}/save-as-template`; wizard picker + "Save as template". `EventTemplateTest`. |
+| 2026-09-09 | #27 Wizard | ◐ per-step validation + localStorage draft autosave + staff-assignment step; `EventStaffController` (GET/PUT `/events/{id}/staff`) + `GET /users/assignable`. `EventStaffTest`. **Tier 2 complete.** Suite: 81. |
 
 ---
 
@@ -57,7 +61,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
 | **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
-| **2 Core** | #19, #20, #21, #22, #23, #29, #30 | #18, #23(file), #28 | #24, #25, #26, #27 |
+| **2 Core** | #19–#27, #29, #30 | #18(timeline), #23(file), #27(10-step), #28(dyn-status) | — **TIER COMPLETE** |
 | 3 Admin/Dash | #27-adjacent | #42, #43 | #31–#41 (#40 ❌) |
 | 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
 | 5 Housekeeping | #56 | — | #57, #58 |
@@ -214,20 +218,31 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   the builder, public wizard, and manual-reg modal. `FormFieldTypesTest`.
   OPEN: **file upload** — deferred to its own storage-security pass. _PRD §17 ·
   E§20_
-- ☐ **24. Conditional form logic** — the `conditional_logic` column + TS type
-  exist; implement show/hide rules in the builder **and** the public form.
-  _PRD §63 · E§20_
-- ☐ **25. Form-builder UX** — drag/drop reorder, live preview, duplicate-field
-  detection. _E§20_
+- ✅ **24. Conditional form logic** — `conditional_logic` = `{field, operator:
+  equals/not_equals/in/contains, value}`. `App\Modules\Forms\ConditionalLogic` +
+  `conditionalLogic.ts` (shared eval). Builder UI ("only show when <prior choice
+  field> is/is not <option>"); wizard + manual-reg hide non-matching fields live
+  and submit only visible answers; `validateFormAnswers` skips hidden fields.
+  `ConditionalFieldLogicTest`. _PRD §63 · E§20_
+- ✅ **25. Form-builder UX** — HTML5 drag-and-drop on the field handle (no lib);
+  case-insensitive duplicate-key detection (highlights rows, blocks Save,
+  `distinct:ignore_case` server-side); "Preview" toggle renders the participant
+  form honouring conditions. `FormBuilderGuardTest`. _E§20_
 
 ### Events
-- ☐ **26. Event templates (real feature + UI)** — seed richer templates (sports,
-  badminton, football, blood donation, marathon, townhall, training, seminar,
-  client event, gathering, custom); "start from template" in the wizard; allow
-  custom templates. `event_templates` is API-only today. _PRD §42 · E§19_
-- ☐ **27. Event creation wizard** — fuller multi-step flow with per-step
-  validation and safe draft state between steps; include a staff-assignment step.
-  Today a 4-step create modal, no autosave. _E§18_
+- ✅ **26. Event templates** — `EventTemplateSeeder`: 8 built-ins
+  (badminton/football/blood-drive/marathon/townhall/training/seminar/client-
+  dinner/family-day), each `structure` = {defaults, form_fields}. `GET
+  /templates/{id}` + `POST /events/{id}/save-as-template` (snapshots settings +
+  form). Wizard "Start from a template" prefills + applies the form.
+  "Save as template" button on the event console. `EventTemplateTest`. _PRD §42 ·
+  E§19_
+- ◐ **27. Event creation wizard** — DONE: per-step validation gates Next
+  (title / future dates / capacity); draft autosave to localStorage with
+  "Resume draft / Start fresh"; a staff-assignment picker in Review, applied via
+  `PUT /events/{id}/staff` (new `EventStaffController` + `GET /users/assignable`
+  — also the backend for #34). `EventStaffTest`. OPEN: a full 10-screen wizard
+  was not pursued (the 4-step + template + staff flow covers the intent). _E§18_
 - ◐ **28. Event lifecycle guards** — DONE: `EventService` enforces a
   status-transition map on both `changeStatus()` (`PATCH /events/{id}/status`)
   and any `status` slipped through `updateEvent()` (`PUT /events/{id}`); invalid

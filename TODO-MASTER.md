@@ -44,6 +44,10 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #20 + #26 Bulk actions | ✅ `POST /events/{id}/registrations/bulk` (approve/reject/cancel) + `POST /events/{id}/attendance/bulk`; approve/reject moved into `RegistrationService` so single + bulk share one locked path; UI: row checkboxes + select-all + bulk bar. `RegistrationOpsTest`. |
 | 2026-09-09 | #22 Registration filters | ✅ `indexForEvent` gains department / date_from / date_to / checked_in; UI filter bar with Clear. |
 | 2026-09-09 | #23 Form field types | ✅ textarea, employee_id, date, time, multi_select, consent, info added — allow-listed on save, server-validated (consent-required, option membership, date/time/number format), rendered in the builder + public wizard + manual-reg modal. `FormFieldTypesTest`. File upload deferred. |
+| 2026-09-09 | #29 Capacity visibility | ✅ over-capacity banner + `available_seats`/`over_capacity`/`utilisation_pct` on `GET /events/{id}`. `EventCapacitySnapshotTest`. |
+| 2026-09-09 | #30 Check-in states | ✅ `QrScannerConsole` shows SUCCESS/DUPLICATE/INVALID/REVOKED/WRONG EVENT/CANCELLED/NOT ELIGIBLE as a large card + participant panel; backend messages mapped client-side. |
+| 2026-09-09 | #21 CSV import | ✅ `RegistrationImportService` shared by the artisan command + `POST /events/{id}/registrations/import` (dry-run, 2000-row cap, audited); `RegistrationImportModal`. `RegistrationImportTest`. |
+| 2026-09-09 | #19 Participant directory | ✅ `GET /participants` + `/lookup` + `/{id}`; `/admin/participants` page + drawer + nav; manual-reg autocomplete. `ParticipantDirectoryTest`. Suite: 69. |
 
 ---
 
@@ -53,7 +57,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
 | **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
-| **2 Core** | #20, #22, #23, #29, #30 | #18, #23(file), #28 | #19, #21, #24, #25, #26, #27 |
+| **2 Core** | #19, #20, #21, #22, #23, #29, #30 | #18, #23(file), #28 | #24, #25, #26, #27 |
 | 3 Admin/Dash | #27-adjacent | #42, #43 | #31–#41 (#40 ❌) |
 | 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
 | 5 Housekeeping | #56 | — | #57, #58 |
@@ -178,18 +182,26 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   QR); UI note editor (save-on-blur) + reissue button in the expanded row.
   OPEN: a full status-history timeline in the UI (backend `show` already
   returns `statusHistory`). _PRD §37_
-- ☐ **19. Global Participant Management + employee search** — cross-event
-  participant list; search by employee ID / name / email / phone / department;
-  autocomplete, duplicate warning, participant preview; seam for a corporate
-  directory API. _PRD §36 · E§17_
+- ✅ **19. Global Participant Management + employee search** —
+  `ParticipantController` (registration tier): `GET /participants` (deduped
+  directory, `registrations_count`, search over name/email/phone/employee_id/
+  department), `GET /participants/lookup` (lean 2-char type-ahead),
+  `GET /participants/{id}` (full cross-event history). `/admin/participants`
+  page + detail drawer + nav item; ManualRegistrationModal autocompletes from
+  the directory and prefills an existing person. `ParticipantDirectoryTest`.
+  (Corporate-directory-API seam: a future provider slots in behind
+  `/participants/lookup`.) _PRD §36 · E§17_
 - ✅ **20. Bulk actions** — `POST /events/{id}/registrations/bulk`
   (approve/reject/cancel a selection, each through the shared locked service
   path, `skipped[]` for bad ids, audited) + `POST /events/{id}/attendance/bulk`.
   UI: row checkboxes + select-all + a bulk action bar. `RegistrationOpsTest`.
   (Export-selected folds into #35.) _PRD §82 · E§24, §26_
-- ☐ **21. CSV import (endpoint + UI)** — promote the existing
-  `registrations:import` artisan command to an authorized HTTP endpoint + admin
-  screen, reusing `RegistrationService`. _PRD §83_
+- ✅ **21. CSV import (endpoint + UI)** — `RegistrationImportService` (CSV parse
+  + import loop) lifted out of the artisan command and shared with
+  `POST /events/{id}/registrations/import` (registration tier, event-scoped,
+  dry-run flag, 2000-row cap, audited). Every row still goes through
+  `RegistrationService::register()`. `RegistrationImportModal` (file picker +
+  "validate only" + per-row failure list). `RegistrationImportTest`. _PRD §83_
 - ✅ **22. Registration table filters** — `indexForEvent` adds `department`
   (like), `date_from` / `date_to` (registered_at), `checked_in` yes/no,
   alongside the existing status / attendance / free-text + pagination. UI

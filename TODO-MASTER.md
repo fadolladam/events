@@ -65,6 +65,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #49 + #50 Observability | ✅ split `security`/`audit`/`performance` log channels; `AuditService` mirrors security actions; `RequestContext` middleware (`X-Request-Id`, shared context, slow-request warning); `GET /api/health` (governance) with db/cache checks + login-failure/lockout/disk signals, 503 when degraded. `ObservabilityTest`. |
 | 2026-09-09 | #51 + #52 Perf & indexes | ✅ killed the event-list N+1 (`withCount` on `index`/`publicEvents`); `EventListPerformanceTest` (fixed query count vs. dataset size); `2026_09_09_000002_add_query_hotpath_indexes` (waitlist order, answer lookups, audit tab, event_staff, checkin time). |
 | 2026-09-09 | #54 Expand test suite | ✅ `RbacMatrixTest` (endpoint × 6 roles + no-auth), `DuplicateRegistrationTest`, `AttendanceTest`, `RateLimitTest`; rest of the E§48 list already covered by existing suites. **Tier 4 complete.** Suite: 152. |
+| 2026-09-09 | #57 + #58 Housekeeping | ✅ dropped the never-used `system_settings` table (reversible migration + model removed); rewrote `stack.md` to the real stack; archived superseded reports (`audit.md`, `debug.md`, `qa-report.md`, `GAP-REPORT*.md`) into `docs/archive/`. **Tier 5 complete.** Suite: 152. |
 
 ---
 
@@ -77,7 +78,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | **2 Core** | #19–#27, #29, #30 | #18(timeline), #23(file), #27(10-step), #28(dyn-status) | — **TIER COMPLETE** |
 | **3 Admin/Dash** | #31–#33, #35–#39, #41–#43 | #34(dedicated waitlist/checkin report views) | #40 ❌ — **TIER COMPLETE** |
 | **4 Production** | #37(CI), #44–#55 | — | — **TIER COMPLETE** |
-| 5 Housekeeping | #56 | — | #57, #58 |
+| **5 Housekeeping** | #56, #57, #58 | — | — **TIER COMPLETE** |
 
 ---
 
@@ -394,11 +395,16 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   accounts (added `organizer@` / `registration@`) and assigns them to the demo
   Blood Donation event's `event_staff`. README table is now accurate. (No
   `viewer` account — not in the README list.)
-- ☐ **57. `system_settings` table** — use it (app settings) or drop it; model
-  exists, zero reads/writes.
-- ☐ **58. Refresh / archive stale docs** — `stack.md` (describes Blade/Apache/
-  Excel — wrong) and `implementation.md` (says "React 18 / nginx / storage:link"
-  — now React 19, single Laravel app, symlink-free `/storage` route).
+- ✅ **57. `system_settings` table** — DROPPED. Never read or written;
+  organisation config lives on the `organizations` row.
+  `2026_09_09_000003_drop_unused_system_settings_table` (reversible), `SystemSetting`
+  model deleted, `PROJECT.md` schema table updated.
+- ✅ **58. Refresh / archive stale docs** — `stack.md` rewritten to the real
+  stack (React 19 SPA / Vite / DOMPDF + native CSV / notifications out of scope /
+  Docker+XAMPP) with a "what changed from the original sketch" table. Superseded
+  point-in-time docs (`audit.md`, `debug.md`, `qa-report.md`, `GAP-REPORT*.md`)
+  moved to `docs/archive/` with an index README; `PROJECT.md` references fixed.
+  (`implementation.md` / `implementations-2.md` were already deleted at merge.)
 
 ---
 

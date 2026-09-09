@@ -109,7 +109,9 @@ events/
 │
 ├── install/                         .env.xampp · events.sql · INSTALL-XAMPP.md
 ├── docker-compose.yml · serve.sh · serve.bat
-└── prd.md · implementation.md · audit.md · qa-report.md · debug.md · stack.md
+├── prd.md · stack.md · TODO-MASTER.md · DEPLOYMENT.md · TESTING.md
+│                                    SECURITY.md · RBAC-MATRIX.md
+└── docs/archive/                    superseded point-in-time reports (audit, QA, gap)
 ```
 
 Approx size: backend `app/` ≈ 5.0k LOC PHP · frontend `src/` ≈ 9.5k LOC TS/TSX.
@@ -145,9 +147,11 @@ UUID primary keys on `events`, `participants`, `registrations`, `tickets`,
 | `notification_templates` | Per-event or global (`event_id` null) message templates | `trigger_event`, `subject`, `body_template` |
 | `notification_logs` | Dispatch log | `recipient_email`, `trigger_event`, `status` (sent/queued/failed), `error_message` |
 | `audit_logs` | Immutable | `action`, `entity_type`, `entity_id`, `event_id`, `previous_value` (json), `new_value` (json), `ip_address` |
-| `system_settings` | KV store | `key` (unique), `value` (json) |
 
-Dashboard indexes added in `2026_09_07_000001_add_dashboard_indexes.php`.
+Hot-path indexes added in `2026_09_07_000001_add_dashboard_indexes.php` and
+`2026_09_09_000002_add_query_hotpath_indexes.php`. The unused `system_settings`
+KV table was dropped in `2026_09_09_000003_drop_unused_system_settings_table.php`
+— organisation-level configuration lives on the `organizations` row.
 
 ### `events` — notable columns
 
@@ -468,10 +472,11 @@ php artisan test
 
 ## 12. Status & known gaps
 
-From the 2026-09-04 QA pass (`qa-report.md`, `audit.md` 111-section checklist) —
-**"PASS WITH MAJOR GAPS"**. The core engine (event → form → registration →
-capacity → waitlist → promotion → QR → check-in → attendance → report) passed
-every functional test. Outstanding:
+From the 2026-09-04 QA pass (`docs/archive/qa-report.md`, `docs/archive/audit.md`
+111-section checklist) — **"PASS WITH MAJOR GAPS"**. The core engine (event →
+form → registration → capacity → waitlist → promotion → QR → check-in →
+attendance → report) passed every functional test. Most of the gaps below have
+since been closed — see `TODO-MASTER.md` for the current state. Original list:
 
 | ID | Severity | Gap |
 |---|---|---|
@@ -497,6 +502,8 @@ Not production-ready until NOTIF-1 + MANREG-1 land and the suite runs green in C
   `events-frontend` container, symlink-free `/storage` route, XAMPP install kit);
   committed `vendor/` so the app runs with no Composer; Docker publishes one port
   (`5173`).
-- Reference docs in repo root: `prd.md` (full product spec, ~58 KB),
-  `implementation.md`, `audit.md` (QA checklist), `qa-report.md` (QA results),
-  `debug.md` (form-builder per-event fix write-up), `stack.md` (stale sketch).
+- Reference docs in repo root: `prd.md` (full product spec, ~58 KB), `stack.md`
+  (technology stack), `TODO-MASTER.md` (consolidated backlog + progress log),
+  `DEPLOYMENT.md`, `TESTING.md`, `SECURITY.md`, `RBAC-MATRIX.md`. Superseded
+  point-in-time reports (`audit.md`, `qa-report.md`, `GAP-REPORT*.md`,
+  `debug.md`) live in `docs/archive/`.

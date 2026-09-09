@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, type FormField, type FormTemplateSummary } from '../../services/api';
-import { X, Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Layers, BookmarkPlus } from 'lucide-react';
+import { X, Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Layers, BookmarkPlus, GripVertical, Eye } from 'lucide-react';
+import { fieldConditionPasses, type FieldCondition } from './conditionalLogic';
 import { FormTemplatesModal } from './FormTemplatesModal';
 
 interface FormBuilderModalProps {
@@ -26,6 +27,30 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
   const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Duplicate-key detection (case-insensitive). Backend rejects these too.
+  const dupKeys = (() => {
+    const seen = new Set<string>();
+    const dup = new Set<string>();
+    for (const f of fields) {
+      const k = (f.field_key || '').toLowerCase();
+      if (seen.has(k)) dup.add(k);
+      seen.add(k);
+    }
+    return dup;
+  })();
+
+  const reorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0) return;
+    setFields((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next.map((f, i) => ({ ...f, field_order: i + 1 }));
+    });
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -110,6 +135,10 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
     // Never PUT when the form failed to load — that would push whatever fields
     // are on screen onto an event whose real form we never saw.
     if (loadError) return;
+    if (dupKeys.size > 0) {
+      alert('Two fields share the same key. Rename one of the duplicated questions before saving.');
+      return;
+    }
     setSaving(true);
     try {
       await apiClient.put(`/events/${eventId}/form`, { fields });
@@ -230,6 +259,29 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
             </div>
           )}
 
+          {!loading && !loadError && (
+            <div className="flex items-center justify-between">
+              {dupKeys.size > 0 ? (
+                <span className="text-[11px] font-bold text-rose-600">
+                  Duplicate field key — rename a highlighted question before saving.
+                </span>
+              ) : (
+                <span className="text-[11px] text-slate-400">Drag the handle to reorder.</span>
+              )}
+              <button
+                onClick={() => setShowPreview((v) => !v)}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                {showPreview ? 'Hide preview' : 'Preview'}
+              </button>
+            </div>
+          )}
+
+          {showPreview && !loading && !loadError && (
+            <FormPreview fields={fields} />
+          )}
+
           {loading ? (
             <div className="text-center py-12 text-slate-400 text-xs">Loading form builder...</div>
           ) : loadError ? (
@@ -238,14 +290,29 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
             fields.map((f, i) => {
               const isLocked = ['full_name', 'email'].includes(f.field_key);
 
+              const isDup = dupKeys.has((f.field_key || '').toLowerCase());
+
               return (
                 <div
                   key={f.field_key}
-                  className="p-5 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 shadow-xs space-y-3"
+                  onDragOver={(e) => { e.preventDefault(); }}
+                  onDrop={(e) => { e.preventDefault(); if (dragIndex !== null) reorder(dragIndex, i); setDragIndex(null); }}
+                  className={`p-5 rounded-2xl border bg-white shadow-xs space-y-3 ${
+                    isDup ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200 hover:border-slate-300'
+                  } ${dragIndex === i ? 'opacity-50' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[11px]">
-                      {i + 1}
+                    <span
+                      draggable={!isLocked}
+                      onDragStart={() => setDragIndex(i)}
+                      onDragEnd={() => setDragIndex(null)}
+                      className={`flex items-center gap-1 ${isLocked ? '' : 'cursor-grab active:cursor-grabbing'}`}
+                      title={isLocked ? '' : 'Drag to reorder'}
+                    >
+                      {!isLocked && <GripVertical className="w-3.5 h-3.5 text-slate-300" />}
+                      <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[11px]">
+                        {i + 1}
+                      </span>
                     </span>
 
                     <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -481,6 +548,82 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
         onClose={() => setManagerOpen(false)}
         onChanged={fetchTemplates}
       />
+    </div>
+  );
+};
+
+/** Read-only render of the current fields as a participant would see them. */
+const FormPreview: React.FC<{ fields: FormField[] }> = ({ fields }) => {
+  const [ans, setAns] = useState<Record<string, unknown>>({});
+  const set = (k: string, v: unknown) => setAns((p) => ({ ...p, [k]: v }));
+
+  const visible = fields.filter(
+    (f) => !f.is_hidden && fieldConditionPasses(f.conditional_logic as FieldCondition | undefined, ans),
+  );
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Live preview</p>
+      {visible.map((f) => (
+        <div key={f.field_key}>
+          {f.type === 'info' ? (
+            <p className="rounded-lg bg-white px-3 py-2 text-xs text-slate-600">{f.label}</p>
+          ) : (
+            <>
+              <label className="mb-1 block text-[11px] font-bold text-slate-600">
+                {f.label} {f.is_required && <span className="text-rose-500">*</span>}
+              </label>
+              {f.type === 'select' ? (
+                <select
+                  onChange={(e) => set(f.field_key, e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs"
+                >
+                  <option value="">-- Select --</option>
+                  {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : f.type === 'radio' ? (
+                <div className="space-y-1">
+                  {(f.options || []).map((o) => (
+                    <label key={o} className="flex items-center gap-2 text-xs text-slate-700">
+                      <input type="radio" name={`pv-${f.field_key}`} onChange={() => set(f.field_key, o)} />
+                      {o}
+                    </label>
+                  ))}
+                </div>
+              ) : f.type === 'checkbox' || f.type === 'multi_select' ? (
+                <div className="space-y-1">
+                  {(f.options || []).map((o) => (
+                    <label key={o} className="flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        onChange={(e) => {
+                          const cur = Array.isArray(ans[f.field_key]) ? (ans[f.field_key] as string[]) : [];
+                          set(f.field_key, e.target.checked ? [...cur, o] : cur.filter((x) => x !== o));
+                        }}
+                      />
+                      {o}
+                    </label>
+                  ))}
+                </div>
+              ) : f.type === 'consent' ? (
+                <label className="flex items-center gap-2 text-xs text-slate-700">
+                  <input type="checkbox" onChange={(e) => set(f.field_key, e.target.checked)} />
+                  {f.placeholder || 'I agree'}
+                </label>
+              ) : f.type === 'textarea' ? (
+                <textarea rows={2} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs" />
+              ) : (
+                <input
+                  type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text'}
+                  onChange={(e) => set(f.field_key, e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+                />
+              )}
+              {f.help_text && <p className="mt-0.5 text-[10px] text-slate-400">{f.help_text}</p>}
+            </>
+          )}
+        </div>
+      ))}
     </div>
   );
 };

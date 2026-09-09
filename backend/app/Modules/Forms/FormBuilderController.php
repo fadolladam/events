@@ -33,7 +33,7 @@ class FormBuilderController extends Controller
 
         $validated = $request->validate([
             'fields' => 'required|array|min:1',
-            'fields.*.field_key' => 'required|string',
+            'fields.*.field_key' => 'required|string|distinct:ignore_case',
             'fields.*.label' => 'required|string',
             'fields.*.type' => 'required|string|in:text,textarea,email,phone,employee_id,number,date,time,select,radio,checkbox,multi_select,consent,info',
             'fields.*.placeholder' => 'nullable|string',

@@ -104,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/events/{id}/status', [EventController::class, 'setStatus']);
         Route::get('/events/{eventId}/staff', [EventStaffController::class, 'index']);
         Route::put('/events/{eventId}/staff', [EventStaffController::class, 'sync']);
+        Route::get('/events/{eventId}/audit-logs', [AuditController::class, 'forEvent']);
         Route::get('/users/assignable', [AuthController::class, 'assignable']);
 
         Route::post('/categories', [EventCategoryController::class, 'store']);

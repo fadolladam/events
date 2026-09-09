@@ -10,6 +10,8 @@ import { FormBuilderModal } from '../forms/FormBuilderModal';
 import { ManualRegistrationModal } from '../registration/ManualRegistrationModal';
 import { RegistrationImportModal } from '../registration/RegistrationImportModal';
 import { EventOverviewTab } from './EventOverviewTab';
+import { EventStaffTab } from './EventStaffTab';
+import { EventAuditTab } from './EventAuditTab';
 import { EventSettingsModal } from './EventSettingsModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -22,6 +24,8 @@ import {
   CheckSquare,
   BarChart3,
   Settings,
+  UserCog,
+  ShieldCheck,
   ArrowLeft,
   RefreshCw,
   UserPlus,
@@ -291,6 +295,8 @@ export const EventDetailManage: React.FC = () => {
     checkin: canCheckin,
     attendance: canCheckin,
     reports: true,
+    staff: canManage,
+    audit: canManage,
   };
   const currentTab = tabAccess[routeTab] ? routeTab : 'overview';
 
@@ -350,6 +356,15 @@ export const EventDetailManage: React.FC = () => {
         </div>
       </div>
 
+      {/* Compact event header strip (visible on every tab) */}
+      <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600 shadow-xs">
+        <span><span className="text-slate-400">Date</span> {new Date(event.start_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+        <span><span className="text-slate-400">Venue</span> {event.venue_name || (event.event_type === 'virtual' ? 'Virtual' : '—')}</span>
+        <span><span className="text-slate-400">Capacity</span> {event.confirmed_count ?? 0}/{event.capacity}{event.over_capacity ? ' ⚠' : ''}</span>
+        <span><span className="text-slate-400">Waitlist</span> {event.waitlist_count ?? 0}</span>
+        <span><span className="text-slate-400">Checked in</span> {event.checked_in_count ?? 0}</span>
+      </div>
+
       {/* Tab Navigation — filtered by the signed-in user's role */}
       <div className="flex border-b border-slate-200 gap-6 text-xs font-bold overflow-x-auto pb-px custom-scrollbar">
         {[
@@ -360,6 +375,8 @@ export const EventDetailManage: React.FC = () => {
           { key: 'checkin', label: 'QR Check-In Console', icon: QrCode, show: canCheckin, onClick: () => goToTab('checkin') },
           { key: 'attendance', label: 'Attendance Roster', icon: CheckSquare, show: canCheckin, onClick: () => goToTab('attendance') },
           { key: 'reports', label: 'Analytics & Reports', icon: BarChart3, show: true, onClick: () => goToTab('reports') },
+          { key: 'staff', label: 'Team', icon: UserCog, show: canManage, onClick: () => goToTab('staff') },
+          { key: 'audit', label: 'Audit', icon: ShieldCheck, show: canManage, onClick: () => goToTab('audit') },
           { key: 'settings', label: 'Settings', icon: Settings, show: canManage, onClick: () => goToTab('settings') },
         ]
           .filter((t) => t.show)
@@ -772,6 +789,9 @@ export const EventDetailManage: React.FC = () => {
       {currentTab === 'reports' && (
         <EventReportsPage eventId={eventUuid} embedded onBack={() => goToTab('overview')} />
       )}
+
+      {currentTab === 'staff' && canManage && <EventStaffTab eventId={eventUuid} canManage={canManage} />}
+      {currentTab === 'audit' && canManage && <EventAuditTab eventId={eventUuid} />}
       </ErrorBoundary>
 
       {/* Form Builder Modal */}

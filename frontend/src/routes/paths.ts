@@ -28,5 +28,7 @@ export const EVENT_TABS = [
   'checkin',
   'attendance',
   'reports',
+  'staff',
+  'audit',
 ] as const;
 export type EventTab = (typeof EVENT_TABS)[number];

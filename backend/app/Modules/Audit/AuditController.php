@@ -39,4 +39,26 @@ class AuditController extends Controller
 
         return response()->json($logs);
     }
+
+    /** Per-event audit trail — visible to that event's managers (route is event-scoped). */
+    public function forEvent(Request $request, string $eventId): JsonResponse
+    {
+        $query = AuditLog::query()->with('user')->where('event_id', $eventId);
+
+        if ($request->filled('action')) {
+            $query->where('action', $request->input('action'));
+        }
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(fn ($q) => $q->where('action', 'like', "%{$search}%")
+                ->orWhere('user_name', 'like', "%{$search}%")
+                ->orWhere('entity_type', 'like', "%{$search}%"));
+        }
+
+        $perPage = min(100, max(1, (int) $request->input('per_page', 30)));
+
+        return response()->json(
+            $query->orderByDesc('created_at')->paginate($perPage)
+        );
+    }
 }

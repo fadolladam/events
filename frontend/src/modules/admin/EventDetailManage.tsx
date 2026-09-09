@@ -64,6 +64,14 @@ export const EventDetailManage: React.FC = () => {
   const [cancelling, setCancelling] = useState(false);
   const [showManualReg, setShowManualReg] = useState(false);
   const [regFlash, setRegFlash] = useState<string | null>(null);
+  const [regFilters, setRegFilters] = useState<{ status: string; department: string; checked_in: string; date_from: string }>({
+    status: '',
+    department: '',
+    checked_in: '',
+    date_from: '',
+  });
+  const [selectedRegIds, setSelectedRegIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -125,7 +133,7 @@ export const EventDetailManage: React.FC = () => {
       fetchRegistrations(eventUuid, regPage, regPerPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeTab, eventUuid, regPage, regPerPage]);
+  }, [routeTab, eventUuid, regPage, regPerPage, regFilters]);
 
   const fetchEvent = async () => {
     try {
@@ -140,8 +148,16 @@ export const EventDetailManage: React.FC = () => {
     setRegLoading(true);
     try {
       const res = await apiClient.get(`/events/${id}/registrations`, {
-        params: { page, per_page: perPage },
+        params: {
+          page,
+          per_page: perPage,
+          ...(regFilters.status ? { status: regFilters.status } : {}),
+          ...(regFilters.department ? { department: regFilters.department } : {}),
+          ...(regFilters.checked_in ? { checked_in: regFilters.checked_in } : {}),
+          ...(regFilters.date_from ? { date_from: regFilters.date_from } : {}),
+        },
       });
+      setSelectedRegIds(new Set());
       setRegistrations(res.data.data || []);
       setRegMeta({
         total: res.data.total ?? (res.data.data || []).length,
@@ -180,6 +196,56 @@ export const EventDetailManage: React.FC = () => {
       alert(err.response?.data?.message || 'Failed to cancel this registration.');
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const regColSpan = canRegistrations ? 9 : 8;
+
+  const toggleRegSelected = (id: string) =>
+    setSelectedRegIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const runBulk = async (action: 'approve' | 'reject' | 'cancel') => {
+    const ids = Array.from(selectedRegIds);
+    if (ids.length === 0) return;
+    if (action !== 'approve' && !confirm(`${action[0].toUpperCase()}${action.slice(1)} ${ids.length} selected registration(s)?`)) return;
+    setBulkBusy(true);
+    try {
+      const res = await apiClient.post(`/events/${eventUuid}/registrations/bulk`, { action, ids });
+      const { processed, skipped } = res.data as { processed: number; skipped: unknown[] };
+      setRegFlash(`${action} — ${processed} done${skipped.length ? `, ${skipped.length} skipped` : ''}.`);
+      window.setTimeout(() => setRegFlash(null), 6000);
+      await Promise.all([fetchRegistrations(eventUuid, regPage, regPerPage), fetchEvent()]);
+    } catch (err: any) {
+      alert(err.response?.data?.message || `Bulk ${action} failed.`);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const reissueTicket = async (id: string) => {
+    try {
+      await apiClient.post(`/registrations/${id}/reissue-ticket`);
+      setRegFlash('Ticket reissued — the old QR no longer scans.');
+      window.setTimeout(() => setRegFlash(null), 6000);
+      await fetchRegistrations(eventUuid, regPage, regPerPage);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Could not reissue the ticket.');
+    }
+  };
+
+  const saveNotes = async (id: string, notes: string) => {
+    try {
+      await apiClient.patch(`/registrations/${id}`, { notes });
+      setRegFlash('Note saved.');
+      window.setTimeout(() => setRegFlash(null), 4000);
+      await fetchRegistrations(eventUuid, regPage, regPerPage);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Could not save the note.');
     }
   };
 
@@ -396,10 +462,79 @@ export const EventDetailManage: React.FC = () => {
             </div>
           )}
 
+          {/* Filter bar */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-xs">
+            <select
+              value={regFilters.status}
+              onChange={(e) => { setRegPage(1); setRegFilters((f) => ({ ...f, status: e.target.value })); }}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1"
+            >
+              <option value="">All statuses</option>
+              {['pending', 'confirmed', 'waitlisted', 'approved', 'rejected', 'cancelled'].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <select
+              value={regFilters.checked_in}
+              onChange={(e) => { setRegPage(1); setRegFilters((f) => ({ ...f, checked_in: e.target.value })); }}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1"
+            >
+              <option value="">Any check-in</option>
+              <option value="yes">Checked in</option>
+              <option value="no">Not checked in</option>
+            </select>
+            <input
+              value={regFilters.department}
+              onChange={(e) => { setRegPage(1); setRegFilters((f) => ({ ...f, department: e.target.value })); }}
+              placeholder="Department"
+              className="w-32 rounded-lg border border-slate-200 px-2 py-1"
+            />
+            <label className="flex items-center gap-1 text-slate-400">
+              From
+              <input
+                type="date"
+                value={regFilters.date_from}
+                onChange={(e) => { setRegPage(1); setRegFilters((f) => ({ ...f, date_from: e.target.value })); }}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-slate-700"
+              />
+            </label>
+            {(regFilters.status || regFilters.department || regFilters.checked_in || regFilters.date_from) && (
+              <button
+                onClick={() => { setRegPage(1); setRegFilters({ status: '', department: '', checked_in: '', date_from: '' }); }}
+                className="text-slate-400 hover:text-slate-700 underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Bulk action bar */}
+          {canRegistrations && selectedRegIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-indigo-100 bg-indigo-50 px-4 py-2 text-xs">
+              <span className="font-bold text-indigo-900">{selectedRegIds.size} selected</span>
+              <button disabled={bulkBusy} onClick={() => runBulk('approve')} className="rounded-lg bg-emerald-600 px-2.5 py-1 font-bold text-white hover:bg-emerald-500 disabled:opacity-50">Approve</button>
+              <button disabled={bulkBusy} onClick={() => runBulk('reject')} className="rounded-lg bg-amber-600 px-2.5 py-1 font-bold text-white hover:bg-amber-500 disabled:opacity-50">Reject</button>
+              <button disabled={bulkBusy} onClick={() => runBulk('cancel')} className="rounded-lg bg-rose-600 px-2.5 py-1 font-bold text-white hover:bg-rose-500 disabled:opacity-50">Cancel</button>
+              <button onClick={() => setSelectedRegIds(new Set())} className="text-indigo-500 hover:text-indigo-800 underline">Clear selection</button>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 uppercase font-bold text-[10px]">
+                  {canRegistrations && (
+                    <th className="py-3 px-4 w-8">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all on this page"
+                        checked={registrations.length > 0 && selectedRegIds.size === registrations.length}
+                        onChange={(e) =>
+                          setSelectedRegIds(e.target.checked ? new Set(registrations.map((r) => r.id)) : new Set())
+                        }
+                      />
+                    </th>
+                  )}
                   <th className="py-3 px-4 w-8"></th>
                   <th className="py-3 px-4">Permanent Reg #</th>
                   <th className="py-3 px-4">Name</th>
@@ -413,11 +548,11 @@ export const EventDetailManage: React.FC = () => {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {regMeta.total === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">No registrations recorded yet.</td>
+                    <td colSpan={regColSpan} className="py-12 text-center text-slate-400">No registrations recorded yet.</td>
                   </tr>
                 ) : registrations.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={regColSpan} className="py-12 text-center text-slate-400">
                       {regLoading ? 'Loading…' : 'No registrations on this page.'}
                     </td>
                   </tr>
@@ -443,6 +578,16 @@ export const EventDetailManage: React.FC = () => {
                           className="hover:bg-slate-50/80 cursor-pointer"
                           onClick={() => setExpandedRegId(isOpen ? null : r.id)}
                         >
+                          {canRegistrations && (
+                            <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${r.registration_number}`}
+                                checked={selectedRegIds.has(r.id)}
+                                onChange={() => toggleRegSelected(r.id)}
+                              />
+                            </td>
+                          )}
                           <td className="py-3.5 px-4 text-slate-400">
                             {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           </td>
@@ -483,7 +628,7 @@ export const EventDetailManage: React.FC = () => {
 
                         {isOpen && (
                           <tr className="bg-slate-50/60">
-                            <td colSpan={8} className="px-4 py-4">
+                            <td colSpan={regColSpan} className="px-4 py-4">
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
                                 {extras
                                   .filter(([, v]) => v)
@@ -514,6 +659,31 @@ export const EventDetailManage: React.FC = () => {
                                   <span className="text-slate-400 italic">No additional registration answers.</span>
                                 )}
                               </div>
+
+                              {canRegistrations && (
+                                <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-3 sm:flex-row sm:items-end">
+                                  <label className="flex-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    Internal note
+                                    <textarea
+                                      defaultValue={r.notes || ''}
+                                      rows={2}
+                                      onBlur={(e) => {
+                                        if ((e.target.value || '') !== (r.notes || '')) saveNotes(r.id, e.target.value);
+                                      }}
+                                      className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-normal normal-case text-slate-800"
+                                      placeholder="Saved on blur…"
+                                    />
+                                  </label>
+                                  {r.status === 'confirmed' && (
+                                    <button
+                                      onClick={() => reissueTicket(r.id)}
+                                      className="h-8 shrink-0 rounded-lg border border-slate-300 px-3 text-[11px] font-bold text-slate-600 hover:bg-slate-100"
+                                    >
+                                      Reissue ticket
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         )}

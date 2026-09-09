@@ -287,6 +287,7 @@ export interface Registration {
   confirmed_at?: string;
   waitlisted_at?: string;
   checked_in_at?: string;
+  notes?: string | null;
   ticket?: Ticket;
   answers?: Array<{ field_key: string; field_label: string; value_text?: string; value_json?: any }>;
 }

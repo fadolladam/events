@@ -12,6 +12,36 @@ interface QrScannerConsoleProps {
 
 const READER_ID = 'qr-reader-container';
 
+type ScanState = 'SUCCESS' | 'DUPLICATE' | 'INVALID' | 'REVOKED' | 'WRONG_EVENT' | 'CANCELLED' | 'NOT_ELIGIBLE';
+
+interface ScanOutcome {
+  state: ScanState;
+  detail?: string;
+  at?: string;
+  participant?: { name?: string; employee_id?: string; department?: string; registration_number?: string };
+}
+
+const STATE_STYLE: Record<ScanState, { bg: string; label: string }> = {
+  SUCCESS: { bg: 'bg-emerald-600', label: 'CHECKED IN' },
+  DUPLICATE: { bg: 'bg-amber-500', label: 'ALREADY CHECKED IN' },
+  INVALID: { bg: 'bg-rose-600', label: 'INVALID TICKET' },
+  REVOKED: { bg: 'bg-rose-700', label: 'TICKET REVOKED' },
+  WRONG_EVENT: { bg: 'bg-rose-600', label: 'WRONG EVENT' },
+  CANCELLED: { bg: 'bg-slate-700', label: 'REGISTRATION CANCELLED' },
+  NOT_ELIGIBLE: { bg: 'bg-rose-600', label: 'NOT ELIGIBLE' },
+};
+
+/** Map a backend check-in error message to one of the named states. */
+const classifyCheckinError = (msg: string): ScanState => {
+  const m = (msg || '').toLowerCase();
+  if (m.includes('revoked')) return 'REVOKED';
+  if (m.includes('not this event') || m.includes('registered for')) return 'WRONG_EVENT';
+  if (m.includes('already')) return 'DUPLICATE';
+  if (m.includes('cancelled')) return 'CANCELLED';
+  if (m.includes('must be confirmed') || m.includes('status:')) return 'NOT_ELIGIBLE';
+  return 'INVALID';
+};
+
 export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onBack, embedded = false }) => {
   const [event, setEvent] = useState<EventItem | null>(null);
   const [manualSearch, setManualSearch] = useState('');
@@ -19,6 +49,7 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
   const [recentCheckins, setRecentCheckins] = useState<CheckinRecord[]>([]);
   const [processing, setProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
+  const [scanOutcome, setScanOutcome] = useState<ScanOutcome | null>(null);
 
   // Camera state
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
@@ -108,25 +139,33 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
     processingRef.current = true;
     setProcessing(true);
     setStatusMessage(null);
+    setScanOutcome(null);
 
     try {
       const res = await apiClient.post(`/events/${eventId}/checkin/scan`, { qr_data: decodedText });
+      const p = res.data.participant;
+      const reg = res.data.registration;
+      const panel = {
+        name: p?.name,
+        employee_id: p?.employee_id,
+        department: p?.department,
+        registration_number: reg?.registration_number,
+      };
 
       if (res.data.already_checked_in) {
         playFeedback('warning');
-        setStatusMessage({
-          type: 'warning',
-          text: `Participant ALREADY checked in${res.data.last_checkin?.checked_in_at ? ` at ${new Date(res.data.last_checkin.checked_in_at).toLocaleTimeString()}` : ''}`,
+        setScanOutcome({
+          state: 'DUPLICATE',
+          at: res.data.last_checkin?.checked_in_at,
+          participant: panel,
         });
       } else {
-        await executeCheckIn(res.data.registration.id);
+        await executeCheckIn(reg.id, panel);
       }
     } catch (err: any) {
       playFeedback('error');
-      setStatusMessage({
-        type: 'error',
-        text: err.response?.data?.message || 'Invalid ticket or QR not recognized.',
-      });
+      const msg = err.response?.data?.message || 'Ticket or QR not recognized.';
+      setScanOutcome({ state: classifyCheckinError(msg), detail: msg });
     } finally {
       setTimeout(() => {
         processingRef.current = false;
@@ -135,7 +174,7 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
     }
   };
 
-  const executeCheckIn = async (registrationId: string) => {
+  const executeCheckIn = async (registrationId: string, panel?: ScanOutcome['participant']) => {
     try {
       const res = await apiClient.post(`/events/${eventId}/checkin`, {
         registration_id: registrationId,
@@ -143,14 +182,22 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
         gate: 'Main Gate',
       });
       playFeedback('success');
-      setStatusMessage({
-        type: 'success',
-        text: `CHECK-IN SUCCESSFUL: ${res.data.checkin.registration?.participant?.name || 'Attendee'}`,
+      const reg = res.data.checkin.registration;
+      setScanOutcome({
+        state: 'SUCCESS',
+        at: res.data.checkin.checked_in_at,
+        participant: panel ?? {
+          name: reg?.participant?.name,
+          employee_id: reg?.participant?.employee_id,
+          department: reg?.participant?.department,
+          registration_number: reg?.registration_number,
+        },
       });
       fetchEventAndRecent();
     } catch (err: any) {
       playFeedback('error');
-      setStatusMessage({ type: 'error', text: err.response?.data?.message || 'Check-in failed.' });
+      const msg = err.response?.data?.message || 'Check-in failed.';
+      setScanOutcome({ state: classifyCheckinError(msg), detail: msg, participant: panel });
     }
   };
 
@@ -268,7 +315,53 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
         </div>
       </div>
 
-      {/* Status Feedback Alert */}
+      {/* Large scan-outcome card (#30) */}
+      {scanOutcome && (
+        <div className={`rounded-2xl p-5 text-white shadow-lg ${STATE_STYLE[scanOutcome.state].bg}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {scanOutcome.state === 'SUCCESS' ? (
+                <CheckCircle2 className="h-8 w-8 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-8 w-8 shrink-0" />
+              )}
+              <div>
+                <div className="text-lg font-extrabold tracking-wide">{STATE_STYLE[scanOutcome.state].label}</div>
+                {scanOutcome.at && (
+                  <div className="text-xs opacity-90">
+                    {scanOutcome.state === 'SUCCESS' ? 'at ' : 'previously at '}
+                    {new Date(scanOutcome.at).toLocaleTimeString()}
+                  </div>
+                )}
+                {scanOutcome.detail && <div className="text-xs opacity-90">{scanOutcome.detail}</div>}
+              </div>
+            </div>
+            <button
+              onClick={() => setScanOutcome(null)}
+              className="rounded-lg bg-white/20 px-2.5 py-1 text-xs font-bold hover:bg-white/30"
+            >
+              Scan next
+            </button>
+          </div>
+
+          {scanOutcome.participant?.name && (
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 border-t border-white/20 pt-3 text-sm sm:grid-cols-4">
+              <div><span className="block text-[10px] uppercase opacity-75">Name</span>{scanOutcome.participant.name}</div>
+              {scanOutcome.participant.registration_number && (
+                <div><span className="block text-[10px] uppercase opacity-75">Reg #</span><span className="font-mono">{scanOutcome.participant.registration_number}</span></div>
+              )}
+              {scanOutcome.participant.employee_id && (
+                <div><span className="block text-[10px] uppercase opacity-75">Employee ID</span>{scanOutcome.participant.employee_id}</div>
+              )}
+              {scanOutcome.participant.department && (
+                <div><span className="block text-[10px] uppercase opacity-75">Department</span>{scanOutcome.participant.department}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Status Feedback Alert (manual-search + file flows) */}
       {statusMessage && (
         <div
           className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-3 transition-all ${

@@ -11,8 +11,6 @@ use App\Models\Participant;
 use App\Models\Registration;
 use App\Models\RegistrationAnswer;
 use App\Models\RegistrationForm;
-use App\Models\RegistrationStatusHistory;
-use App\Models\Ticket;
 use App\Models\User;
 use App\Models\WaitlistHistory;
 use App\Modules\Tickets\TicketService;
@@ -61,13 +59,33 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
+        $eventOrganizer = User::create([
+            'name' => 'Aidan Lim (Event Organizer)',
+            'email' => 'organizer@rhbgroup.com',
+            'password' => Hash::make('password123'),
+            'role' => 'event_organizer',
+            'organization_id' => $org->id,
+            'phone' => '+60 12-100 0003',
+            'status' => 'active',
+        ]);
+
+        $registrationOfficer = User::create([
+            'name' => 'Priya Nair (Registration Officer)',
+            'email' => 'registration@rhbgroup.com',
+            'password' => Hash::make('password123'),
+            'role' => 'registration_officer',
+            'organization_id' => $org->id,
+            'phone' => '+60 12-100 0004',
+            'status' => 'active',
+        ]);
+
         $checkinStaff = User::create([
             'name' => 'Marcus Vance (Check-In Staff)',
             'email' => 'staff@rhbgroup.com',
             'password' => Hash::make('password123'),
             'role' => 'checkin_staff',
             'organization_id' => $org->id,
-            'phone' => '+60 12-100 0003',
+            'phone' => '+60 12-100 0005',
             'status' => 'active',
         ]);
 
@@ -137,6 +155,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $eventAdmin->id, 'role' => 'owner']);
+        EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $eventOrganizer->id, 'role' => 'organizer']);
+        EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
         EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
 
         // Form for Blood Donation
@@ -173,7 +193,7 @@ class DatabaseSeeder extends Seeder
             $participant = Participant::create([
                 'name' => "Donor Participant {$i}",
                 'email' => "donor{$i}@example.com",
-                'phone' => "+1 (555) 200-" . str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                'phone' => '+1 (555) 200-'.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
                 'country' => 'United States',
                 'employee_id' => "EMP-{$i}",
                 'department' => $i % 2 === 0 ? 'Engineering' : 'Marketing',
@@ -191,7 +211,7 @@ class DatabaseSeeder extends Seeder
                 'secure_access_token' => Str::random(48),
                 'registered_at' => now()->subHours(80 - $i),
                 'confirmed_at' => $isConfirmed ? now()->subHours(80 - $i) : null,
-                'waitlisted_at' => !$isConfirmed ? now()->subHours(80 - $i) : null,
+                'waitlisted_at' => ! $isConfirmed ? now()->subHours(80 - $i) : null,
                 'checked_in_at' => ($isConfirmed && $i <= 15) ? now()->subMinutes(60 - $i) : null,
             ]);
 
@@ -210,7 +230,7 @@ class DatabaseSeeder extends Seeder
                     'registration_id' => $registration->id,
                     'action' => 'joined_queue',
                     'new_position' => $i - 70,
-                    'notes' => "Joined queue at position #" . ($i - 70),
+                    'notes' => 'Joined queue at position #'.($i - 70),
                     'created_at' => now()->subHours(80 - $i),
                 ]);
             }

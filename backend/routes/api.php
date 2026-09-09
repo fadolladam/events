@@ -1,8 +1,8 @@
 <?php
 
+use App\Modules\Attendance\AttendanceController;
 use App\Modules\Audit\AuditController;
 use App\Modules\Auth\AuthController;
-use App\Modules\Attendance\AttendanceController;
 use App\Modules\CheckIn\CheckInController;
 use App\Modules\Dashboard\DashboardController;
 use App\Modules\Events\EventCategoryController;
@@ -24,12 +24,16 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | RoleMiddleware ('role' alias) lets super_admin through unconditionally,
 | so it is omitted from the lists below.
+|
+| Declared with guarded define() rather than `const` because the test
+| runner boots the application (and re-includes this file) more than once
+| per process; a bare `const` would fatal with "already defined".
 */
-const ROLE_STAFF = 'role:event_admin,event_organizer,registration_officer,checkin_staff,viewer';
-const ROLE_EVENT_MANAGER = 'role:event_admin,event_organizer';
-const ROLE_REGISTRATION = 'role:event_admin,event_organizer,registration_officer';
-const ROLE_CHECKIN = 'role:event_admin,event_organizer,registration_officer,checkin_staff';
-const ROLE_ADMIN = 'role:event_admin';
+defined('ROLE_STAFF') || define('ROLE_STAFF', 'role:event_admin,event_organizer,registration_officer,checkin_staff,viewer');
+defined('ROLE_EVENT_MANAGER') || define('ROLE_EVENT_MANAGER', 'role:event_admin,event_organizer');
+defined('ROLE_REGISTRATION') || define('ROLE_REGISTRATION', 'role:event_admin,event_organizer,registration_officer');
+defined('ROLE_CHECKIN') || define('ROLE_CHECKIN', 'role:event_admin,event_organizer,registration_officer,checkin_staff');
+defined('ROLE_ADMIN') || define('ROLE_ADMIN', 'role:event_admin');
 
 /*
 |--------------------------------------------------------------------------
@@ -53,8 +57,8 @@ Route::get('/public/registration/{token}', [RegistrationController::class, 'show
 Route::post('/public/registration/{token}/cancel', [RegistrationController::class, 'cancelPublic'])->middleware('throttle:10,1');
 
 // Public QR Ticket
-Route::get('/public/ticket/{token}', [TicketController::class, 'showPublicByToken']);
-Route::get('/public/ticket/{token}/qr', [TicketController::class, 'getQrImage']);
+Route::get('/public/ticket/{token}', [TicketController::class, 'showPublicByToken'])->middleware('throttle:30,1');
+Route::get('/public/ticket/{token}/qr', [TicketController::class, 'getQrImage'])->middleware('throttle:60,1');
 
 /*
 |--------------------------------------------------------------------------
@@ -107,8 +111,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/forms/templates/{id}', [FormTemplateController::class, 'update']);
         Route::delete('/forms/templates/{id}', [FormTemplateController::class, 'destroy']);
 
-        Route::get('/events/{eventId}/export/csv', [ReportController::class, 'exportCsv']);
-        Route::get('/events/{eventId}/export/pdf', [ReportController::class, 'exportPdf']);
+        Route::get('/events/{eventId}/export/csv', [ReportController::class, 'exportCsv'])->middleware('throttle:20,1');
+        Route::get('/events/{eventId}/export/pdf', [ReportController::class, 'exportPdf'])->middleware('throttle:20,1');
 
         Route::get('/notifications/templates', [NotificationController::class, 'templates']);
         Route::post('/notifications/templates', [NotificationController::class, 'storeTemplate']);
@@ -135,10 +139,11 @@ Route::middleware('auth:sanctum')->group(function () {
     | Onsite operations — adds check-in staff
     */
     Route::middleware(ROLE_CHECKIN)->group(function () {
-        Route::post('/events/{eventId}/checkin/scan', [CheckInController::class, 'scan']);
-        Route::post('/events/{eventId}/checkin', [CheckInController::class, 'process']);
-        Route::post('/events/{eventId}/checkin/undo', [CheckInController::class, 'undo']);
-        Route::get('/events/{eventId}/checkin/search', [CheckInController::class, 'search']);
+        // Generous limits — a busy gate scans continuously on event day.
+        Route::post('/events/{eventId}/checkin/scan', [CheckInController::class, 'scan'])->middleware('throttle:240,1');
+        Route::post('/events/{eventId}/checkin', [CheckInController::class, 'process'])->middleware('throttle:240,1');
+        Route::post('/events/{eventId}/checkin/undo', [CheckInController::class, 'undo'])->middleware('throttle:120,1');
+        Route::get('/events/{eventId}/checkin/search', [CheckInController::class, 'search'])->middleware('throttle:120,1');
         Route::get('/events/{eventId}/checkin/recent', [CheckInController::class, 'recentCheckins']);
 
         Route::get('/events/{eventId}/attendance', [AttendanceController::class, 'index']);
@@ -154,6 +159,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/audit-logs', [AuditController::class, 'index']);
 
         Route::get('/users', [AuthController::class, 'users']);
-        Route::post('/users', [AuthController::class, 'storeUser']);
+        Route::post('/users', [AuthController::class, 'storeUser'])->middleware('throttle:20,1');
     });
 });

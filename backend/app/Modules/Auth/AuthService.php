@@ -13,16 +13,33 @@ class AuthService
     {
         $user = User::where('email', $email)->first();
 
-        if (!$user || !Hash::check($password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials do not match our records.'],
-            ]);
+        // One generic message for every failure mode (bad email, bad password,
+        // deactivated account) so the endpoint cannot be used to enumerate which
+        // addresses have accounts.
+        $genericFailure = ValidationException::withMessages([
+            'email' => ['Invalid credentials.'],
+        ]);
+
+        if (! $user || ! Hash::check($password, $user->password)) {
+            AuditService::log(
+                action: 'user_login_failed',
+                entityType: 'User',
+                entityId: $user?->id ? (string) $user->id : null,
+                newValue: ['email' => $email, 'reason' => $user ? 'bad_password' : 'unknown_email'],
+            );
+
+            throw $genericFailure;
         }
 
         if ($user->status !== 'active') {
-            throw ValidationException::withMessages([
-                'email' => ['Your account has been deactivated.'],
-            ]);
+            AuditService::log(
+                action: 'user_login_failed',
+                entityType: 'User',
+                entityId: (string) $user->id,
+                newValue: ['email' => $email, 'reason' => 'inactive_account'],
+            );
+
+            throw $genericFailure;
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;

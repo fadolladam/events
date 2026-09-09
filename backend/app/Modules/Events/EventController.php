@@ -4,6 +4,7 @@ namespace App\Modules\Events;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Modules\Audit\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,6 +50,7 @@ class EventController extends Controller
             $event->waitlist_count = $event->waitlistedRegistrations()->count();
             $event->checked_in_count = $event->checkins()->count();
             $event->dynamic_status = $event->calculateDynamicStatus();
+
             return $event;
         });
 
@@ -82,6 +84,7 @@ class EventController extends Controller
             $event->confirmed_count = $event->confirmedRegistrations()->count();
             $event->waitlist_count = $event->waitlistedRegistrations()->count();
             $event->dynamic_status = $event->calculateDynamicStatus();
+
             return $event;
         });
 
@@ -249,14 +252,24 @@ class EventController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $event = Event::findOrFail($id);
-        
+
         // If event has registrations, soft-archive instead of hard deleting
         if ($event->registrations()->exists()) {
             $this->eventService->changeStatus($event, 'archived');
+
             return response()->json(['message' => 'Event has active registrations and was moved to archive.']);
         }
 
+        AuditService::log(
+            action: 'event_deleted',
+            entityType: 'Event',
+            entityId: (string) $event->id,
+            eventId: $event->id,
+            previousValue: ['title' => $event->title, 'code' => $event->event_code, 'status' => $event->status],
+        );
+
         $event->delete();
+
         return response()->json(['message' => 'Event deleted successfully.']);
     }
 }

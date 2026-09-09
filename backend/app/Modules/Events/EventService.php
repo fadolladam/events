@@ -4,15 +4,33 @@ namespace App\Modules\Events;
 
 use App\Models\Event;
 use App\Models\EventStaff;
-use App\Models\RegistrationForm;
 use App\Models\FormField;
+use App\Models\RegistrationForm;
 use App\Modules\Audit\AuditService;
 use App\Modules\Waitlist\WaitlistService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class EventService
 {
+    /**
+     * Allowed status transitions. A status may always stay unchanged; any other
+     * move must appear in this map. Keeps the lifecycle consistent everywhere
+     * (admin console, dashboard, registration validation, reports).
+     */
+    private const STATUS_TRANSITIONS = [
+        'draft' => ['upcoming', 'registration_open', 'cancelled', 'archived'],
+        'upcoming' => ['draft', 'registration_open', 'registration_closed', 'ongoing', 'cancelled', 'archived'],
+        'registration_open' => ['full', 'registration_closed', 'upcoming', 'ongoing', 'cancelled', 'archived'],
+        'full' => ['registration_open', 'registration_closed', 'ongoing', 'cancelled', 'archived'],
+        'registration_closed' => ['registration_open', 'ongoing', 'completed', 'cancelled', 'archived'],
+        'ongoing' => ['registration_closed', 'completed', 'cancelled', 'archived'],
+        'completed' => ['archived', 'ongoing'],
+        'cancelled' => ['draft', 'archived'],
+        'archived' => ['draft'],
+    ];
+
     public function createEvent(array $data, ?int $userId = null): Event
     {
         return DB::transaction(function () use ($data, $userId) {
@@ -98,6 +116,17 @@ class EventService
             $previous = $event->toArray();
             $oldCapacity = $event->capacity;
 
+            // A status change slipped in through the generic update payload must
+            // obey the same lifecycle rules as the dedicated status endpoint.
+            if (array_key_exists('status', $data) && $data['status'] !== $event->status) {
+                $allowed = self::STATUS_TRANSITIONS[$event->status] ?? [];
+                if (! in_array($data['status'], $allowed, true)) {
+                    throw ValidationException::withMessages([
+                        'status' => ["An event cannot move from \"{$event->status}\" to \"{$data['status']}\"."],
+                    ]);
+                }
+            }
+
             $event->update($data);
 
             AuditService::log(
@@ -122,9 +151,9 @@ class EventService
     {
         return DB::transaction(function () use ($sourceEvent, $userId) {
             $data = $sourceEvent->replicate(['id', 'slug', 'event_code', 'created_at', 'updated_at', 'published_at', 'archived_at'])->toArray();
-            $data['title'] = $sourceEvent->title . ' (Copy)';
+            $data['title'] = $sourceEvent->title.' (Copy)';
             $data['status'] = 'draft';
-            
+
             $newEvent = $this->createEvent($data, $userId);
 
             // Copy custom form fields from source form
@@ -154,9 +183,19 @@ class EventService
     public function changeStatus(Event $event, string $newStatus): Event
     {
         $oldStatus = $event->status;
+
+        if ($oldStatus !== $newStatus) {
+            $allowed = self::STATUS_TRANSITIONS[$oldStatus] ?? [];
+            if (! in_array($newStatus, $allowed, true)) {
+                throw ValidationException::withMessages([
+                    'status' => ["An event cannot move from \"{$oldStatus}\" to \"{$newStatus}\"."],
+                ]);
+            }
+        }
+
         $event->status = $newStatus;
 
-        if ($newStatus === 'registration_open' && !$event->published_at) {
+        if ($newStatus === 'registration_open' && ! $event->published_at) {
             $event->published_at = now();
         }
 

@@ -36,6 +36,9 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #9 Per-event authorization | ✅ `EventScopeMiddleware` (`event.scope`) on the 4 protected groups; org-wide roles unchanged, scoped roles limited to `event_staff` events; `EventController::index` filtered. `EventScopeAuthorizationTest`. |
 | 2026-09-09 | #10 IDOR | ✅ registration-id routes resolve the parent event + apply the scope check; public token routes already object-scoped. |
 | 2026-09-09 | #11 RBAC matrix | ◐ `RBAC-MATRIX.md` written (endpoint × role × event-scope). Follow-up: exhaustive automated endpoint×7-role suite (E§49). |
+| 2026-09-09 | #5 Password security | ✅ policy (min 12 / mixed / numbers / symbols / pwned-in-prod), `POST /auth/password` self-change (revokes other tokens), `POST /users/{id}/force-password-reset`, `must_change_password` + `last_login_at` columns, seeders blocked in prod. Email reset-link flow deferred (needs notifications). `PasswordManagementTest` (8). |
+| 2026-09-09 | #7 MFA-ready / #8 SSO-ready | ◐ integration points documented in `SECURITY.md`; authorization layer already decoupled from the auth mechanism. Full TOTP / Entra OIDC not built (deliberate — no half-implementations). |
+| 2026-09-09 | #55 Docs | ◐ `SECURITY.md` + `RBAC-MATRIX.md` added. Still: `DEPLOYMENT.md`, production install guide, testing guide. |
 
 ---
 
@@ -44,7 +47,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | Tier | Done | Partial | Open / N-A |
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
-| **1 Security** | #6, #9, #10, #13, #14, #15 | #11, #16, #17 | #4, #5, #7, #8, #12 |
+| **1 Security** | #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #4, #12 |
 | 2 Core | #23, #27 | #28 | #18–#22, #24, #25, #26, #29, #30 |
 | 3 Admin/Dash | #27 | #42, #43 | #31–#41 (#40 ❌) |
 | 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
@@ -84,17 +87,25 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   stateful cookie auth: HttpOnly + Secure + SameSite, CSRF, session regenerate on
   login, invalidate on logout, expired-session handling, safe redirect preserving
   `?next=`. Must not break public registration. _E§1_
-- ☐ **5. Password security** — strong policy, confirmation, change-password
-  endpoint, force-reset flag, optional force-reset-on-first-login, reset-token
-  expiry, drop any default/demo credential dependence. _E§2 · PRD §31_
-- ◐ **6. Login protection** — DONE: generic `"Invalid credentials."` for bad
-  email / bad password / inactive account (no enumeration); every failure written
-  to `audit_logs` as `user_login_failed`. STILL OPEN: progressive lockout /
-  backoff on repeated failures (beyond the fixed `throttle:10,1`). _E§3_
-- ☐ **7. MFA-ready architecture** — TOTP for `super_admin` / `event_admin` /
-  `event_organizer` if practical; otherwise a clean seam to add it later. _E§4_
-- ☐ **8. SSO-ready architecture** — separate local-auth / IdP-auth / app-authz;
-  seam for Microsoft Entra ID; no hard-coded RHB infra. _E§5_
+- ✅ **5. Password security** — `PasswordRules` / `Password::defaults()` (min 12,
+  mixed case, numbers, symbols; pwned-check in prod only). `POST /auth/password`
+  self-change (verify current, forbid reuse, revoke other tokens, audited).
+  `POST /users/{id}/force-password-reset` (governance). `must_change_password`
+  (default true for admin-created) + `password_changed_at` + `last_login_at`
+  columns. Seeders refuse to run in prod. `PasswordManagementTest`.
+  DEFERRED: email forgot-password reset-link (needs notifications). _E§2 · PRD §31_
+- ✅ **6. Login protection** — generic `"Invalid credentials."` (no enumeration);
+  failures audited; per-email+IP `RateLimiter` lockout (5 → 15 min → 429, correct
+  password still refused during lockout, cleared on success),
+  `user_login_locked_out` audit. `LoginThrottleTest`. _E§3_
+- ◐ **7. MFA-ready architecture** — integration point documented in
+  `SECURITY.md` (`AuthService::login`, before token issue). Full TOTP enrolment
+  + verify endpoint + `two_factor_*` columns NOT built (deliberate: no
+  half-implementation). _E§4_
+- ◐ **8. SSO-ready architecture** — `SECURITY.md` documents the seam; the
+  authorization layer (role tier + event scope) is already independent of the
+  auth mechanism, so an Entra OIDC callback that resolves a `User` + issues a
+  Sanctum token slots in without restructuring. No provider code yet. _E§5_
 
 ### Authorization
 - ✅ **9. Per-event authorization** — `EventScopeMiddleware` (alias `event.scope`)
@@ -283,9 +294,9 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   EventPolicy, EventStaffAuthorization, ManualRegistration, DuplicateRegistration,
   TicketSecurity, Attendance, UploadSecurity, ReportPermission, AuditLog,
   RateLimit (+ existing Capacity, Waitlist, CheckIn). _PRD §92–94 · E§48_
-- ☐ **55. Docs set** — `SECURITY.md`, RBAC matrix, testing guide, production
-  install guide; refresh `README` (see item 56); keep `PROJECT.md` current.
-  _E§52_
+- ◐ **55. Docs set** — DONE: `SECURITY.md`, `RBAC-MATRIX.md`, `PROJECT.md`.
+  OPEN: `DEPLOYMENT.md` / production install guide (#38), testing guide, README
+  refresh. _E§52_
 
 ---
 

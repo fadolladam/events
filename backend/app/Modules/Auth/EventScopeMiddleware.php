@@ -30,7 +30,7 @@ class EventScopeMiddleware
         $user = $request->user();
 
         if (! $user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            abort(401, 'Unauthenticated.');
         }
 
         $eventId = $this->resolveEventId($request);
@@ -42,7 +42,7 @@ class EventScopeMiddleware
         // Organization confinement — applies to everyone except super_admin.
         $orgId = $user->scopedOrgId();
         if ($orgId !== null && Event::whereKey($eventId)->value('organization_id') !== $orgId) {
-            return response()->json(['message' => 'You do not have access to this event.'], 403);
+            abort(403, 'You do not have access to this event.');
         }
 
         // event_admin: any event in their org (already checked above).
@@ -51,9 +51,7 @@ class EventScopeMiddleware
         }
 
         if (! $user->canManageEvent($eventId)) {
-            return response()->json([
-                'message' => 'You do not have access to this event.',
-            ], 403);
+            abort(403, 'You do not have access to this event.');
         }
 
         return $next($request);

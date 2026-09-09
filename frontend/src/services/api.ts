@@ -57,19 +57,23 @@ export const fetchMe = async (): Promise<User | null> => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const path = window.location.pathname;
+    const onPublic =
+      path === '/' ||
+      path.startsWith('/events/') ||
+      path.startsWith('/ticket/') ||
+      path === '/lookup' ||
+      path.startsWith('/login');
+
+    // 401 (no session) or 419 (session/CSRF expired) → drop the cache and, on
+    // an admin page, bounce to login preserving the destination.
+    if (status === 401 || status === 419) {
       try {
         localStorage.removeItem(USER_KEY);
       } catch {
         /* ignore */
       }
-      const path = window.location.pathname;
-      const onPublic =
-        path === '/' ||
-        path.startsWith('/events/') ||
-        path.startsWith('/ticket/') ||
-        path === '/lookup' ||
-        path.startsWith('/login');
       if (!onPublic) {
         const next = encodeURIComponent(path + window.location.search);
         window.location.assign(`/login?next=${next}`);

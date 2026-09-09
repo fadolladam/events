@@ -19,7 +19,7 @@ class RoleMiddleware
         $user = $request->user();
 
         if (! $user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            abort(401, 'Unauthenticated.');
         }
 
         // Super Admin has access to all roles
@@ -35,6 +35,6 @@ class RoleMiddleware
             return $next($request);
         }
 
-        return response()->json(['message' => 'Forbidden. Insufficient permissions.'], 403);
+        abort(403, 'You do not have permission for this action.');
     }
 }

@@ -48,7 +48,10 @@ for the full specification.
 ### Option A — Docker (fastest)
 
 ```bash
+cp .env.docker.example .env
+docker compose run --rm events-backend php artisan key:generate --show   # paste APP_KEY into .env
 docker compose up -d --build
+docker compose exec events-backend php artisan migrate --seed            # local demo data
 ```
 
 Open **http://localhost:5173**.
@@ -56,12 +59,16 @@ Open **http://localhost:5173**.
 | Service | URL | Notes |
 |---|---|---|
 | `events-backend` | http://localhost:5173 | Laravel API **+ the built React SPA** |
-| `events-db` | `localhost:3306` | MySQL 8, persistent volume `events_db_data` |
+| `events-db` | `127.0.0.1:3306` | MySQL 8 (loopback only), volume `events_db_data` |
 
 ```bash
 docker compose logs -f     # tail logs
 docker compose down         # stop
 ```
+
+> `APP_KEY` has no default — the stack won't start without it. `migrate --seed`
+> is refused when `APP_ENV=production` (the demo accounts use `password123`).
+> Production: see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 > After a **frontend** change: `cd frontend && npm run build` (outputs into
 > `backend/public/`), then `docker compose up -d --build`.

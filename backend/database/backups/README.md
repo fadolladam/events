@@ -1,8 +1,30 @@
 # Database backups
 
 Full `mysqldump` snapshots of the `events` MySQL database (the one the
-`events-db` container serves). Dump files (`*.sql`, `*.sql.gz`) are
+`events-db` container serves). Dump files (`*.sql`, `*.sql.gz`, `*.sql.gpg`) are
 **git-ignored** — this folder is tracked only so the location is stable.
+
+## Automated (recommended)
+
+`install/backup.sh` — cron-friendly **encrypted** daily dump with retention:
+
+```cron
+0 2 * * *  /srv/rhb-events/install/backup.sh >> /var/log/rhb-events-backup.log 2>&1
+```
+
+Set `GPG_RECIPIENT` (asymmetric) or `BACKUP_PASSPHRASE` (symmetric) — it refuses
+to leave a plaintext dump. `RETENTION_DAYS` (default 14) prunes old `.sql.gpg`
+files. Bare metal: `BACKUP_MODE=direct` + `DB_*`.
+
+**Verify a backup** (into a throwaway DB, never the live one):
+
+```bash
+./install/restore-verify.sh backend/database/backups/events_backup_XXXX.sql.gpg
+```
+
+Do this on a schedule too — an unverified backup is not a backup.
+
+## Manual
 
 ## Make a new backup
 

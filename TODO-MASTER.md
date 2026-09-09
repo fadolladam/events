@@ -57,6 +57,9 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #34 + #35 Reports/export | ◐ `RegistrationFilters` shared; CSV gains answer columns + tz + filter-respect + audited filters; `departments` + `answer_summary` in `eventStats`. `ReportExportTest`. OPEN: PDF parity, dedicated waitlist/checkin report views. |
 | 2026-09-09 | #36 User management | ✅ `PATCH /users/{id}` + `/admin/users` page (list/edit/create/force-reset/last-login). `UserManagementTest`. |
 | 2026-09-09 | #33/#41/#42 | ✅ per-event readiness checklist on Overview; `/admin/calendar` month view; OpenStreetMap embed on the public event page. **Tier 3: 7 done / 3 partial; only #38, #39 open.** Suite: 94. |
+| 2026-09-09 | #38 Org settings | ✅ `OrganizationController` GET/PUT `/organization` (governance); `/admin/settings` page. `OrganizationSettingsTest`. |
+| 2026-09-09 | #39 Multi-org scoping | ✅ `User::scopedOrgId()`; `EventScopeMiddleware` rejects out-of-org events (event_admin included), and `events` list / search / participants / dashboards filter by the caller's org; new events inherit the creator's org. `MultiOrgScopingTest`. |
+| 2026-09-09 | #34/#35 PDF + #43 | ✅ PDF export = filters + tz + dept/answers + audited filters; every `alert()`/`confirm()` swept onto `toast()` / `confirmDialog()` (new `uiFeedback` + `FeedbackHost`). **Tier 3 complete.** Suite: 100. |
 
 ---
 
@@ -67,7 +70,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
 | **1 Security** | #4, #5, #6, #9, #10, #13, #14, #15 | #7, #8, #11, #16, #17 | #12 |
 | **2 Core** | #19–#27, #29, #30 | #18(timeline), #23(file), #27(10-step), #28(dyn-status) | — **TIER COMPLETE** |
-| **3 Admin/Dash** | #31, #32, #33, #36, #37, #41, #42 | #34, #35, #43 | #38, #39 · #40 ❌ |
+| **3 Admin/Dash** | #31–#33, #36–#39, #41–#43 | #34(views), #35(pdf-stream) | #40 ❌ — **TIER COMPLETE** |
 | 4 Production | #37(CI), #51 | #44, #46, #52, #55 | #38, #39, #45, #47–#50, #53, #54 |
 | 5 Housekeeping | #56 | — | #57, #58 |
 
@@ -284,16 +287,17 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   `readiness` checklist (details / schedule / reg window / form / capacity /
   venue / team / check-in staff / branding / published) with %, each item
   honest; rendered at the top of the Overview tab. _E§29_
-- ◐ **34. Reports expansion** — DONE: `departments` breakdown + `answer_summary`
-  (per-option counts for every choice field) added to `eventStats`, rendered in
-  `EventReportsPage`; no-show already shown. `ReportExportTest`. OPEN: dedicated
-  waitlist / check-in report *views*. _PRD §48 · E§31_
-- ◐ **35. Export correctness** — DONE: shared `RegistrationFilters`, CSV now
-  honours the console filters, has a column per form field (+ employee_id /
-  department), dates in the event timezone (tz in the header), and the audit
-  entry records the filters. UI "Export CSV" button on the Registrations tab.
-  `ReportExportTest`. OPEN: same treatment for the PDF; large-set streaming
-  review. _PRD §48 · E§32_
+- ◐ **34. Reports expansion** — DONE: `departments` + `answer_summary` in
+  `eventStats`, rendered in `EventReportsPage` and the PDF; no-show shown.
+  `ReportExportTest`. OPEN: dedicated read-only waitlist / check-in report
+  *views* (the Queue + Attendance tabs cover the operational need). _PRD §48 ·
+  E§31_
+- ◐ **35. Export correctness** — DONE: shared `RegistrationFilters`; **both**
+  CSV and PDF honour the console filters, carry a column/section per form
+  field (+ employee_id / department), render dates in the event timezone, and
+  the audit entry records the applied filters. "Export CSV/PDF" buttons on the
+  Registrations tab. `ReportExportTest`. OPEN: review streaming for very large
+  sets. _PRD §48 · E§32_
 - ✅ **36. User management** — `PATCH /users/{id}` (name/phone/role/status, no
   escalation, no self-lockout, deactivate drops tokens, audited) alongside the
   existing create + force-reset + `last_login_at`. `/admin/users` page:
@@ -304,19 +308,25 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   + `GET /users/assignable`; the **Team** tab on the event console. Assigning
   someone grants event-scope access immediately (ties to #9). `EventStaffTest`.
   _PRD §39 · E§34_
-- ☐ **38. Organization settings UI** — name, logo, timezone, contact, branding.
+- ✅ **38. Organization settings** — `OrganizationController` GET/PUT
+  `/organization` (governance): name, logo, default timezone, country, contact,
+  brand colours; audited. `/admin/settings` page. `OrganizationSettingsTest`.
   _PRD §76_
-- ☐ **39. Multi-organization scoping** — actually scope queries by
-  `organization_id` (columns exist, unused). _PRD §77_
+- ✅ **39. Multi-organization scoping** — `User::scopedOrgId()` (null for
+  super_admin / no-org accounts). `EventScopeMiddleware` rejects an event
+  outside the caller's org (event_admin included); `GET /events`, `/search`,
+  `/participants*`, and both dashboards filter by it; new events inherit the
+  creator's `organization_id`. `MultiOrgScopingTest`. _PRD §77_
 - ❌ **40. Notification template editor UI** — **OUT OF SCOPE** (depends on the
   retired notification engine). _PRD §75/§35_
 - ☐ **41. Calendar view** — month/week calendar of events. _PRD §41_
 - ✅ **42. Location map** — `PublicEventDetail` embeds an OpenStreetMap iframe
   from the event's lat/lng (plus the existing link); CSP `frame-src` allows
   only openstreetmap.org. _PRD §40_
-- ◐ **43. Admin UX polish** — replace remaining `alert()` / `confirm()` (~10
-  modules) with the existing `ConfirmDialog`; add breadcrumbs, empty/loading
-  states, validation feedback, keyboard nav, a11y. _PRD §33 · E§35_
+- ✅ **43. Admin UX polish** — new `components/uiFeedback` (`toast()` +
+  `confirmDialog()` backed by one `<FeedbackHost>`); every `window.alert` /
+  `window.confirm` across 11 modules swept onto it. (Breadcrumbs / broader
+  a11y not pursued.) _PRD §33 · E§35_
 
 ---
 

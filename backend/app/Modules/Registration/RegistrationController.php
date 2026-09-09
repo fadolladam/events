@@ -16,7 +16,8 @@ class RegistrationController extends Controller
     public function __construct(
         protected RegistrationService $registrationService,
         protected TicketService $ticketService,
-        protected WaitlistService $waitlistService
+        protected WaitlistService $waitlistService,
+        protected RegistrationImportService $importService,
     ) {}
 
     public function registerPublic(Request $request, string $eventId): JsonResponse
@@ -130,6 +131,50 @@ class RegistrationController extends Controller
             'queue_position' => $result['queue_position'],
             'ticket' => $result['ticket'],
         ], 201);
+    }
+
+    /**
+     * Bulk-import registrations from an uploaded CSV. Same engine as the manual
+     * form and the artisan command (RegistrationImportService). Pass dry_run=1
+     * to validate without writing.
+     */
+    public function import(Request $request, string $eventId): JsonResponse
+    {
+        $event = Event::findOrFail($eventId);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
+            'dry_run' => ['sometimes', 'boolean'],
+        ]);
+
+        $rows = $this->importService->parse(
+            (string) file_get_contents($request->file('file')->getRealPath())
+        );
+
+        if (count($rows) > 2000) {
+            return response()->json(['message' => 'Import is capped at 2000 rows per file.'], 422);
+        }
+
+        $dryRun = (bool) ($validated['dry_run'] ?? false);
+        $result = $this->importService->import($event, $rows, 'csv_import', $dryRun);
+
+        if (! $dryRun) {
+            AuditService::log(
+                action: 'registrations_imported',
+                entityType: 'Event',
+                entityId: (string) $event->id,
+                eventId: $event->id,
+                newValue: [
+                    'rows' => count($rows),
+                    'confirmed' => $result['confirmed'],
+                    'waitlisted' => $result['waitlisted'],
+                    'failed' => count($result['failures']),
+                    'by' => $request->user()?->email,
+                ],
+            );
+        }
+
+        return response()->json(array_merge($result, ['rows' => count($rows)]));
     }
 
     public function lookup(Request $request): JsonResponse

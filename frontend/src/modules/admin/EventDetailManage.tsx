@@ -8,6 +8,7 @@ import { AttendanceRoster } from '../attendance/AttendanceRoster';
 import { EventReportsPage } from '../reports/EventReportsPage';
 import { FormBuilderModal } from '../forms/FormBuilderModal';
 import { ManualRegistrationModal } from '../registration/ManualRegistrationModal';
+import { RegistrationImportModal } from '../registration/RegistrationImportModal';
 import { EventOverviewTab } from './EventOverviewTab';
 import { EventSettingsModal } from './EventSettingsModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
@@ -24,6 +25,7 @@ import {
   ArrowLeft,
   RefreshCw,
   UserPlus,
+  Upload,
   ChevronRight,
   ChevronDown,
   ChevronLeft,
@@ -63,6 +65,7 @@ export const EventDetailManage: React.FC = () => {
   const [cancelTarget, setCancelTarget] = useState<Registration | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [showManualReg, setShowManualReg] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [regFlash, setRegFlash] = useState<string | null>(null);
   const [regFilters, setRegFilters] = useState<{ status: string; department: string; checked_in: string; date_from: string }>({
     status: '',
@@ -425,13 +428,22 @@ export const EventDetailManage: React.FC = () => {
             </h3>
             <div className="flex items-center gap-2">
               {canRegistrations && (
-                <button
-                  onClick={() => setShowManualReg(true)}
-                  className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-500"
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                  Add participant
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowManualReg(true)}
+                    className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-500"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Add participant
+                  </button>
+                  <button
+                    onClick={() => setShowImport(true)}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Import CSV
+                  </button>
+                </>
               )}
               <label className="text-[11px] text-slate-400">Per page</label>
               <select
@@ -774,6 +786,19 @@ export const EventDetailManage: React.FC = () => {
             setRegPage(1);
             Promise.all([fetchRegistrations(eventUuid, 1, regPerPage), fetchEvent()]);
             window.setTimeout(() => setRegFlash(null), 6000);
+          }}
+        />
+      )}
+
+      {event && (
+        <RegistrationImportModal
+          eventId={eventUuid}
+          eventTitle={event.title}
+          isOpen={showImport}
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setRegPage(1);
+            Promise.all([fetchRegistrations(eventUuid, 1, regPerPage), fetchEvent()]);
           }}
         />
       )}

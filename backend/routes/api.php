@@ -127,6 +127,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/events/{eventId}/registrations', [RegistrationController::class, 'indexForEvent']);
         Route::post('/events/{eventId}/registrations', [RegistrationController::class, 'storeManual'])->middleware('throttle:60,1');
         Route::post('/events/{eventId}/registrations/bulk', [RegistrationController::class, 'bulk'])->middleware('throttle:30,1');
+        Route::post('/events/{eventId}/registrations/import', [RegistrationController::class, 'import'])->middleware('throttle:10,1');
         Route::get('/registrations/{id}', [RegistrationController::class, 'show']);
         Route::patch('/registrations/{id}', [RegistrationController::class, 'updateNotes']);
         Route::post('/registrations/{id}/approve', [RegistrationController::class, 'approve']);

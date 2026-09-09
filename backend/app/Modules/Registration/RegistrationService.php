@@ -49,7 +49,7 @@ class RegistrationService
 
             // 3. Find or Create Participant
             $participant = Participant::where('email', $participantData['email'])->first();
-            if (!$participant) {
+            if (! $participant) {
                 $participant = Participant::create([
                     'name' => $participantData['name'],
                     'email' => $participantData['email'],
@@ -256,7 +256,7 @@ class RegistrationService
     protected function validateFormAnswers(Event $event, array $formAnswers): void
     {
         $form = $event->form()->with('fields')->first();
-        if (!$form) {
+        if (! $form) {
             return;
         }
 
@@ -275,6 +275,7 @@ class RegistrationService
 
             if ($field->is_required && $isEmpty) {
                 $errors[$field->field_key] = ["{$field->label} is required."];
+
                 continue;
             }
 
@@ -283,16 +284,16 @@ class RegistrationService
             }
 
             // Constrain choice fields to their configured options.
-            if (in_array($field->type, ['select', 'radio', 'checkbox'], true) && !empty($field->options)) {
+            if (in_array($field->type, ['select', 'radio', 'checkbox'], true) && ! empty($field->options)) {
                 $submitted = is_array($answer) ? $answer : [$answer];
                 $invalid = array_diff($submitted, $field->options);
-                if (!empty($invalid)) {
+                if (! empty($invalid)) {
                     $errors[$field->field_key] = ["\"{$field->label}\" has an invalid selection."];
                 }
             }
         }
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             throw ValidationException::withMessages($errors);
         }
     }
@@ -311,7 +312,7 @@ class RegistrationService
 
         if ($event->duplicate_rule === 'email') {
             $email = $data['email'];
-            $exists = $query->whereHas('participant', fn($q) => $q->where('email', $email))->exists();
+            $exists = $query->whereHas('participant', fn ($q) => $q->where('email', $email))->exists();
             if ($exists) {
                 throw ValidationException::withMessages([
                     'email' => ['You have already registered for this event with this email address.'],
@@ -319,9 +320,9 @@ class RegistrationService
             }
         }
 
-        if ($event->duplicate_rule === 'phone' && !empty($data['phone'])) {
+        if ($event->duplicate_rule === 'phone' && ! empty($data['phone'])) {
             $phone = $data['phone'];
-            $exists = $query->whereHas('participant', fn($q) => $q->where('phone', $phone))->exists();
+            $exists = $query->whereHas('participant', fn ($q) => $q->where('phone', $phone))->exists();
             if ($exists) {
                 throw ValidationException::withMessages([
                     'phone' => ['You have already registered for this event with this phone number.'],
@@ -329,9 +330,9 @@ class RegistrationService
             }
         }
 
-        if ($event->duplicate_rule === 'employee_id' && !empty($data['employee_id'])) {
+        if ($event->duplicate_rule === 'employee_id' && ! empty($data['employee_id'])) {
             $empId = $data['employee_id'];
-            $exists = $query->whereHas('participant', fn($q) => $q->where('employee_id', $empId))->exists();
+            $exists = $query->whereHas('participant', fn ($q) => $q->where('employee_id', $empId))->exists();
             if ($exists) {
                 throw ValidationException::withMessages([
                     'employee_id' => ['You have already registered for this event with this Employee ID.'],

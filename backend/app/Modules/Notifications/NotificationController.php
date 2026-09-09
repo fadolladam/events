@@ -3,7 +3,6 @@
 namespace App\Modules\Notifications;
 
 use App\Http\Controllers\Controller;
-use App\Models\Event;
 use App\Models\NotificationLog;
 use App\Models\NotificationTemplate;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +19,7 @@ class NotificationController extends Controller
         }
 
         $templates = $query->orderBy('trigger_event')->get();
+
         return response()->json($templates);
     }
 
@@ -35,6 +35,7 @@ class NotificationController extends Controller
         ]);
 
         $template = NotificationTemplate::create($validated);
+
         return response()->json($template, 201);
     }
 

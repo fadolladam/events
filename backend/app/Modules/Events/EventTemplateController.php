@@ -12,6 +12,7 @@ class EventTemplateController extends Controller
     public function index(): JsonResponse
     {
         $templates = EventTemplate::with('category')->orderBy('name')->get();
+
         return response()->json($templates);
     }
 
@@ -25,6 +26,7 @@ class EventTemplateController extends Controller
         ]);
 
         $template = EventTemplate::create($validated);
+
         return response()->json($template, 201);
     }
 }

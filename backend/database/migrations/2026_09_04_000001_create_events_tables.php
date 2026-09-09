@@ -66,14 +66,14 @@ return new class extends Migration
             $table->string('contact_name')->nullable();
             $table->string('contact_phone')->nullable();
             $table->string('contact_email')->nullable();
-            
+
             // Dates & Times
             $table->dateTime('start_at')->index();
             $table->dateTime('end_at');
             $table->string('timezone')->default('UTC');
             $table->dateTime('registration_open_at')->nullable();
             $table->dateTime('registration_close_at')->nullable();
-            
+
             // Capacity & Queue Rules
             $table->integer('capacity')->default(100);
             $table->boolean('waitlist_enabled')->default(true);
@@ -82,7 +82,7 @@ return new class extends Migration
             $table->boolean('allow_cancellation')->default(true);
             $table->dateTime('cancellation_deadline')->nullable();
             $table->string('duplicate_rule')->default('email'); // email, phone, employee_id, none
-            
+
             // Location
             $table->string('venue_name')->nullable();
             $table->string('address')->nullable();
@@ -94,12 +94,12 @@ return new class extends Migration
             $table->decimal('longitude', 10, 7)->nullable();
             $table->string('map_url')->nullable();
             $table->string('meeting_url')->nullable();
-            
+
             // Branding & Terms
             $table->string('primary_color')->default('#0f172a');
             $table->string('secondary_color')->default('#2563eb');
             $table->longText('terms_and_conditions')->nullable();
-            
+
             // Meta
             $table->unsignedBigInteger('created_by')->nullable();
             $table->dateTime('published_at')->nullable();
@@ -187,7 +187,7 @@ return new class extends Migration
             $table->string('source')->nullable(); // direct, qr, facebook, email, etc.
             $table->string('secure_access_token')->unique();
             $table->text('notes')->nullable();
-            
+
             // Timestamps
             $table->dateTime('registered_at')->index();
             $table->dateTime('confirmed_at')->nullable();
@@ -365,7 +365,7 @@ return new class extends Migration
         Schema::dropIfExists('events');
         Schema::dropIfExists('event_categories');
         Schema::dropIfExists('organizations');
-        
+
         Schema::table('users', function (Blueprint $table) {
             $table->dropColumn(['role', 'organization_id', 'phone', 'status']);
         });

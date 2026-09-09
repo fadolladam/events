@@ -40,12 +40,14 @@ class ImportRegistrations extends Command
 
         if (! $event) {
             $this->error("No event matches \"{$this->argument('event')}\".");
+
             return self::FAILURE;
         }
 
         $path = $this->argument('file');
         if (! is_file($path)) {
             $this->error("File not found: {$path}");
+
             return self::FAILURE;
         }
 
@@ -62,11 +64,11 @@ class ImportRegistrations extends Command
         // CSV columns that describe the person, not a form answer.
         $participantCols = ['staff_id' => 'employee_id', 'employee_id' => 'employee_id', 'department' => 'department', 'country' => 'country', 'organization' => 'organization'];
         $dryRun = (bool) $this->option('dry-run');
-        $emailDomain = strtolower($event->event_code) . '.import';
+        $emailDomain = strtolower($event->event_code).'.import';
 
         $this->line("Event   : <info>{$event->title}</info>  ({$event->event_code})");
-        $this->line('Capacity: ' . $event->capacity . ($event->waitlist_enabled ? " + waitlist {$event->waitlist_capacity}" : ' (no waitlist)'));
-        $this->line('Rows    : ' . count($rows) . ($dryRun ? '   [DRY RUN — nothing will be written]' : ''));
+        $this->line('Capacity: '.$event->capacity.($event->waitlist_enabled ? " + waitlist {$event->waitlist_capacity}" : ' (no waitlist)'));
+        $this->line('Rows    : '.count($rows).($dryRun ? '   [DRY RUN — nothing will be written]' : ''));
         $this->newLine();
 
         $confirmed = $waitlisted = 0;
@@ -78,6 +80,7 @@ class ImportRegistrations extends Command
             $name = trim((string) ($row['full_name'] ?? ''));
             if ($name === '') {
                 $failures[] = "row {$line}: full_name is required";
+
                 continue;
             }
 
@@ -90,10 +93,11 @@ class ImportRegistrations extends Command
             $email = trim((string) ($row['email'] ?? ''));
             if ($email === '') {
                 $rowKey = trim((string) ($row['queue'] ?? '')) ?: (string) $line;
-                $email = strtolower($event->event_code) . '-' . preg_replace('/[^a-z0-9]+/i', '', $rowKey) . '@' . $emailDomain;
+                $email = strtolower($event->event_code).'-'.preg_replace('/[^a-z0-9]+/i', '', $rowKey).'@'.$emailDomain;
             }
             if (isset($seenEmails[$email])) {
                 $failures[] = "row {$line}: duplicate registration key of row {$seenEmails[$email]}";
+
                 continue;
             }
             $seenEmails[$email] = $line;
@@ -128,6 +132,7 @@ class ImportRegistrations extends Command
                     } elseif ($field->is_required) {
                         $rowErrors[] = "\"{$field->label}\" not accepted";
                     }
+
                     continue;
                 }
 
@@ -135,13 +140,15 @@ class ImportRegistrations extends Command
                     if ($field->is_required) {
                         $rowErrors[] = "\"{$field->label}\" is required but blank";
                     }
+
                     continue;
                 }
 
                 if ($isChoice && ! in_array($raw, $field->options, true)) {
                     $mapped = $this->matchOption($raw, $field->options);
                     if ($mapped === null) {
-                        $rowErrors[] = "\"{$field->label}\" = \"{$raw}\" not in [" . implode(' | ', $field->options) . ']';
+                        $rowErrors[] = "\"{$field->label}\" = \"{$raw}\" not in [".implode(' | ', $field->options).']';
+
                         continue;
                     }
                     $raw = $mapped;
@@ -150,7 +157,8 @@ class ImportRegistrations extends Command
             }
 
             if ($rowErrors) {
-                $failures[] = "row {$line} ({$name}): " . implode('; ', $rowErrors);
+                $failures[] = "row {$line} ({$name}): ".implode('; ', $rowErrors);
+
                 continue;
             }
 
@@ -172,9 +180,9 @@ class ImportRegistrations extends Command
                     $failures[] = "row {$line}: unexpected status \"{$reg->status}\"";
                 }
             } catch (ValidationException $e) {
-                $failures[] = "row {$line} ({$name}): " . implode('; ', array_map(fn ($m) => is_array($m) ? implode(', ', $m) : $m, $e->errors()));
+                $failures[] = "row {$line} ({$name}): ".implode('; ', array_map(fn ($m) => is_array($m) ? implode(', ', $m) : $m, $e->errors()));
             } catch (\Throwable $e) {
-                $failures[] = "row {$line} ({$name}): " . $e->getMessage();
+                $failures[] = "row {$line} ({$name}): ".$e->getMessage();
             }
         }
 
@@ -187,10 +195,11 @@ class ImportRegistrations extends Command
 
         if ($failures) {
             $this->newLine();
-            $this->warn(count($failures) . ' row(s) skipped:');
+            $this->warn(count($failures).' row(s) skipped:');
             foreach ($failures as $f) {
                 $this->line("  - {$f}");
             }
+
             return self::FAILURE;
         }
 
@@ -255,6 +264,7 @@ class ImportRegistrations extends Command
         $fh = fopen($path, 'r');
         if (! $fh) {
             $this->error("Could not open {$path}");
+
             return null;
         }
 
@@ -262,6 +272,7 @@ class ImportRegistrations extends Command
         if (! $header) {
             $this->error('The CSV appears to be empty.');
             fclose($fh);
+
             return null;
         }
         // Strip UTF-8 BOM + normalise header keys.

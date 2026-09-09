@@ -23,10 +23,10 @@ class TicketService
         }
 
         $secureToken = Str::random(64);
-        $ticketCode = 'TCK-' . strtoupper(Str::random(8)) . '-' . date('Y');
-        
+        $ticketCode = 'TCK-'.strtoupper(Str::random(8)).'-'.date('Y');
+
         // Base ticket URL for scanning/viewing
-        $ticketUrl = config('app.url') . "/ticket/{$secureToken}";
+        $ticketUrl = config('app.url')."/ticket/{$secureToken}";
 
         $ticket = Ticket::create([
             'registration_id' => $registration->id,
@@ -54,8 +54,8 @@ class TicketService
      */
     public function generateQrSvg(string $secureToken): string
     {
-        $ticketUrl = config('app.url') . "/ticket/{$secureToken}";
-        
+        $ticketUrl = config('app.url')."/ticket/{$secureToken}";
+
         try {
             return (string) QrCode::size(250)->generate($ticketUrl);
         } catch (\Throwable $e) {
@@ -85,6 +85,7 @@ class TicketService
     protected function generateFallbackSvg(string $content): string
     {
         $encoded = htmlspecialchars($content, ENT_QUOTES, 'UTF-8');
+
         return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' width='200' height='200'><rect width='200' height='200' fill='#ffffff'/><rect x='20' y='20' width='40' height='40' fill='#0f172a'/><rect x='140' y='20' width='40' height='40' fill='#0f172a'/><rect x='20' y='140' width='40' height='40' fill='#0f172a'/><text x='100' y='105' font-size='10' text-anchor='middle' fill='#0f172a'>RHB EVENTS</text></svg>";
     }
 }

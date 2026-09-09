@@ -84,6 +84,7 @@ class CheckInController extends Controller
         }
 
         $results = $this->checkInService->searchForCheckIn($eventId, $keyword);
+
         return response()->json($results);
     }
 

@@ -27,10 +27,10 @@ class CheckInService
 
         $ticket = Ticket::where(function ($q) use ($token) {
             $q->where('secure_token', $token)
-              ->orWhere('ticket_code', $token);
+                ->orWhere('ticket_code', $token);
         })->with(['registration.participant', 'registration.event'])->first();
 
-        if (!$ticket) {
+        if (! $ticket) {
             throw ValidationException::withMessages([
                 'qr' => ['Invalid ticket or QR code.'],
             ]);
@@ -152,7 +152,7 @@ class CheckInService
             // Update Attendance
             Attendance::where('registration_id', $registration->id)->update([
                 'status' => 'not_checked_in',
-                'notes' => 'Check-in reversed: ' . $reason,
+                'notes' => 'Check-in reversed: '.$reason,
                 'updated_by_user_id' => $userId,
             ]);
 
@@ -176,12 +176,12 @@ class CheckInService
         return Registration::where('event_id', $eventId)
             ->where(function ($q) use ($keyword) {
                 $q->where('registration_number', 'like', "%{$keyword}%")
-                  ->orWhereHas('participant', function ($pq) use ($keyword) {
-                      $pq->where('name', 'like', "%{$keyword}%")
-                         ->orWhere('email', 'like', "%{$keyword}%")
-                         ->orWhere('phone', 'like', "%{$keyword}%")
-                         ->orWhere('employee_id', 'like', "%{$keyword}%");
-                  });
+                    ->orWhereHas('participant', function ($pq) use ($keyword) {
+                        $pq->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('email', 'like', "%{$keyword}%")
+                            ->orWhere('phone', 'like', "%{$keyword}%")
+                            ->orWhere('employee_id', 'like', "%{$keyword}%");
+                    });
             })
             ->with(['participant', 'ticket'])
             ->limit(20)

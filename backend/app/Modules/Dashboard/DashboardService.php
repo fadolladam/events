@@ -12,7 +12,6 @@ use App\Models\RegistrationForm;
 use App\Models\WaitlistHistory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Builds the global "Event Operations" dashboard payload from authoritative
@@ -175,7 +174,7 @@ class DashboardService
             $form = $formFieldCounts->get($e->id);
             $activeFields = (int) ($form->active_fields_count ?? 0);
 
-            $push = function (string $priority, string $type, string $issue, string $detail, string $action, string $tab) use (&$items, $e, $r) {
+            $push = function (string $priority, string $type, string $issue, string $detail, string $action, string $tab) use (&$items, $e) {
                 $items[] = [
                     'priority' => $priority,
                     'type' => $type,
@@ -221,19 +220,19 @@ class DashboardService
 
             if ($startsIn24h && ! $checkinStaffEventIds->has($e->id)) {
                 $push('HIGH', 'no_checkin_staff', 'Event starts soon with no check-in staff assigned',
-                    'Starts ' . $e->start_at->diffForHumans() . ' — nobody can run the door.',
+                    'Starts '.$e->start_at->diffForHumans().' — nobody can run the door.',
                     'Assign check-in staff on the event team.', 'settings');
             }
 
             if ($closesIn24h) {
                 $push('MEDIUM', 'registration_closing', 'Registration closes within 24 hours',
-                    'Closes ' . $e->registration_close_at->diffForHumans() . '.',
+                    'Closes '.$e->registration_close_at->diffForHumans().'.',
                     'Confirm capacity and promote any waitlist you intend to admit.', 'queue');
             }
 
             if ($startsIn24h && $checkinStaffEventIds->has($e->id)) {
                 $push('MEDIUM', 'starts_soon', 'Event starts within 24 hours',
-                    'Starts ' . $e->start_at->diffForHumans() . '.',
+                    'Starts '.$e->start_at->diffForHumans().'.',
                     'Do a final readiness check and open the check-in console.', 'checkin');
             }
 

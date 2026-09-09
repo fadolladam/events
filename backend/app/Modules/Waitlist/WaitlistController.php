@@ -29,6 +29,7 @@ class WaitlistController extends Controller
 
         $ranked = $waitlisted->map(function ($reg, $index) {
             $reg->queue_position = $index + 1;
+
             return $reg;
         });
 
@@ -50,7 +51,7 @@ class WaitlistController extends Controller
         $promoted = $this->waitlistService->promoteWaitlistedParticipants($eventId);
 
         return response()->json([
-            'message' => count($promoted) . ' participant(s) promoted successfully.',
+            'message' => count($promoted).' participant(s) promoted successfully.',
             'promoted' => $promoted,
         ]);
     }

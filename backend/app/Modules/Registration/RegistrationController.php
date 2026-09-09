@@ -68,11 +68,11 @@ class RegistrationController extends Controller
         ]);
 
         $registration = Registration::where('registration_number', $validated['registration_number'])
-            ->whereHas('participant', fn($q) => $q->where('email', $validated['email']))
+            ->whereHas('participant', fn ($q) => $q->where('email', $validated['email']))
             ->with(['event', 'participant', 'ticket', 'answers'])
             ->first();
 
-        if (!$registration) {
+        if (! $registration) {
             return response()->json(['message' => 'No matching registration found with provided details.'], 404);
         }
 
@@ -98,7 +98,7 @@ class RegistrationController extends Controller
     {
         $registration = Registration::where('secure_access_token', $token)->firstOrFail();
 
-        if (!$registration->event->allow_cancellation) {
+        if (! $registration->event->allow_cancellation) {
             return response()->json(['message' => 'Cancellations are not enabled for this event.'], 403);
         }
 
@@ -152,6 +152,7 @@ class RegistrationController extends Controller
 
         $registrations->getCollection()->transform(function ($reg) {
             $reg->queue_position = $reg->getQueuePosition();
+
             return $reg;
         });
 

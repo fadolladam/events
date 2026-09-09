@@ -173,7 +173,7 @@ class Event extends Model
         $waitlistCount ??= $this->waitlistedRegistrations()->count();
 
         if ($confirmedCount >= $this->capacity) {
-            if (!$this->waitlist_enabled) {
+            if (! $this->waitlist_enabled) {
                 return 'full';
             }
 

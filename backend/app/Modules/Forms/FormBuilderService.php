@@ -2,8 +2,8 @@
 
 namespace App\Modules\Forms;
 
-use App\Models\RegistrationForm;
 use App\Models\FormField;
+use App\Models\RegistrationForm;
 use App\Modules\Audit\AuditService;
 use Illuminate\Support\Facades\DB;
 
@@ -44,7 +44,7 @@ class FormBuilderService
             }
         }
 
-        return $form->load(['fields' => fn($q) => $q->orderBy('field_order', 'asc')]);
+        return $form->load(['fields' => fn ($q) => $q->orderBy('field_order', 'asc')]);
     }
 
     public function saveFormStructure(string $eventId, array $fields): RegistrationForm
@@ -58,7 +58,7 @@ class FormBuilderService
                     'is_active' => true,
                 ]
             );
-            
+
             // Collect existing fields
             $existingFieldKeys = $form->fields()->pluck('field_key')->toArray();
             $newFieldKeys = array_column($fields, 'field_key');
@@ -66,7 +66,7 @@ class FormBuilderService
             // Soft delete/update: Do not remove fields if registrations already exist, deactivate them instead
             $hasRegistrations = DB::table('registrations')->where('event_id', $eventId)->exists();
 
-            if (!$hasRegistrations) {
+            if (! $hasRegistrations) {
                 $form->fields()->whereNotIn('field_key', $newFieldKeys)->delete();
             } else {
                 // If registrations exist, hide fields not in new list instead of hard deleting

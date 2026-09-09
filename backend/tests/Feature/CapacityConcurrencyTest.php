@@ -5,8 +5,6 @@ namespace Tests\Feature;
 use App\Models\Event;
 use App\Models\Registration;
 use App\Modules\Registration\RegistrationService;
-use App\Modules\Tickets\TicketService;
-use App\Modules\Waitlist\WaitlistService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -57,7 +55,7 @@ class CapacityConcurrencyTest extends TestCase
 
         // Assert registration numbers follow permanent scheme
         $this->assertStringStartsWith('EVT-TEST-', $p1['registration']->registration_number);
-        $this->assertEquals('EVT-TEST-' . date('Y') . '-000001', $p1['registration']->registration_number);
-        $this->assertEquals('EVT-TEST-' . date('Y') . '-000004', $p4['registration']->registration_number);
+        $this->assertEquals('EVT-TEST-'.date('Y').'-000001', $p1['registration']->registration_number);
+        $this->assertEquals('EVT-TEST-'.date('Y').'-000004', $p4['registration']->registration_number);
     }
 }

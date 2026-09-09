@@ -25,7 +25,7 @@ class MediaController extends Controller
 
         $folder = $request->input('folder', 'event-covers');
         $file = $request->file('file');
-        $name = Str::uuid()->toString() . '.' . strtolower($file->getClientOriginalExtension() ?: $file->extension());
+        $name = Str::uuid()->toString().'.'.strtolower($file->getClientOriginalExtension() ?: $file->extension());
 
         $path = $file->storeAs($folder, $name, 'public');
 
@@ -38,7 +38,7 @@ class MediaController extends Controller
 
         return response()->json([
             'path' => $path,
-            'url' => '/storage/' . $path,
+            'url' => '/storage/'.$path,
         ], 201);
     }
 }

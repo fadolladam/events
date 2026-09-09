@@ -13,6 +13,7 @@ class EventCategoryController extends Controller
     public function index(): JsonResponse
     {
         $categories = EventCategory::where('is_active', true)->orderBy('name')->get();
+
         return response()->json($categories);
     }
 

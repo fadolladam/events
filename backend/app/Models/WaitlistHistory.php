@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class WaitlistHistory extends Model
 {
     public $timestamps = false;
+
     protected $table = 'waitlist_history';
 
     protected $fillable = [

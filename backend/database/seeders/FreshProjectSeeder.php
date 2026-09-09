@@ -53,7 +53,7 @@ class FreshProjectSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'role' => $u[2],
                 'organization_id' => $org->id,
-                'phone' => '+60 12-100 000' . ($i + 1),
+                'phone' => '+60 12-100 000'.($i + 1),
                 'status' => 'active',
             ])];
         });

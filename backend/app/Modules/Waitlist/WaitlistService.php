@@ -113,7 +113,7 @@ class WaitlistService
                 'event_id' => $registration->event_id,
                 'registration_id' => $registration->id,
                 'action' => 'priority_updated',
-                'notes' => "Priority changed from {$oldPriority} to {$newPriority}. Reason: " . ($reason ?? 'Admin manual adjustment'),
+                'notes' => "Priority changed from {$oldPriority} to {$newPriority}. Reason: ".($reason ?? 'Admin manual adjustment'),
                 'created_at' => now(),
             ]);
 

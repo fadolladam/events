@@ -18,11 +18,11 @@ class TicketController extends Controller
         $ticket = Ticket::where('secure_token', $token)
             ->with([
                 'registration.participant',
-                'event:id,title,short_title,event_code,start_at,end_at,timezone,venue_name,address,city,primary_color,secondary_color'
+                'event:id,title,short_title,event_code,start_at,end_at,timezone,venue_name,address,city,primary_color,secondary_color',
             ])
             ->first();
 
-        if (!$ticket) {
+        if (! $ticket) {
             return response()->json([
                 'message' => 'No digital ticket is available for this link yet. A QR ticket is issued once your registration is confirmed — if you are on the waiting list, you will receive it when a seat opens up.',
             ], 404);

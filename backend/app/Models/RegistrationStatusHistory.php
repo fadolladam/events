@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class RegistrationStatusHistory extends Model
 {
     public $timestamps = false;
+
     protected $table = 'registration_status_history';
 
     protected $fillable = [

@@ -9,6 +9,7 @@ use App\Models\NotificationLog;
 use App\Models\Participant;
 use App\Models\Registration;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -37,6 +38,7 @@ class ReportService
                 $event->confirmed_count = $event->confirmedRegistrations()->count();
                 $event->waitlist_count = $event->waitlistedRegistrations()->count();
                 $event->checked_in_count = $event->checkins()->count();
+
                 return $event;
             });
 
@@ -262,7 +264,7 @@ class ReportService
     public function exportCsv(string $eventId): StreamedResponse
     {
         $event = Event::findOrFail($eventId);
-        $filename = 'RHB_Events_' . $event->event_code . '_Attendees_' . date('Ymd_His') . '.csv';
+        $filename = 'RHB_Events_'.$event->event_code.'_Attendees_'.date('Ymd_His').'.csv';
 
         $registrations = Registration::where('event_id', $eventId)
             ->with(['participant', 'answers'])
@@ -276,7 +278,7 @@ class ReportService
 
         return new StreamedResponse(function () use ($registrations) {
             $handle = fopen('php://output', 'w');
-            
+
             // Header row
             fputcsv($handle, [
                 'Registration Number',
@@ -310,7 +312,7 @@ class ReportService
         }, 200, $headers);
     }
 
-    public function exportPdfReport(string $eventId): \Illuminate\Http\Response
+    public function exportPdfReport(string $eventId): Response
     {
         $event = Event::findOrFail($eventId);
         $analytics = $this->getEventAnalytics($eventId);
@@ -340,7 +342,7 @@ class ReportService
         </head>
         <body>
             <h1>{$event->title} ({$event->event_code})</h1>
-            <div class='subtitle'>Generated on " . date('d M Y, H:i') . " | Status: " . strtoupper($event->calculateDynamicStatus()) . "</div>
+            <div class='subtitle'>Generated on ".date('d M Y, H:i').' | Status: '.strtoupper($event->calculateDynamicStatus())."</div>
 
             <table class='kpi-table'>
                 <tr>
@@ -371,18 +373,19 @@ class ReportService
                         <td>{$r->registration_number}</td>
                         <td>{$r->participant->name}</td>
                         <td>{$r->participant->email}</td>
-                        <td>" . strtoupper($r->status) . "</td>
-                        <td>" . strtoupper(str_replace('_', ' ', $r->attendance_status)) . "</td>
-                    </tr>";
+                        <td>".strtoupper($r->status).'</td>
+                        <td>'.strtoupper(str_replace('_', ' ', $r->attendance_status)).'</td>
+                    </tr>';
         }
 
-        $html .= "
+        $html .= '
                 </tbody>
             </table>
         </body>
-        </html>";
+        </html>';
 
         $pdf = Pdf::loadHTML($html);
+
         return $pdf->download("RHB_Events_{$event->event_code}_Summary.pdf");
     }
 }

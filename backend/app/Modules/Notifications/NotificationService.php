@@ -28,7 +28,7 @@ class NotificationService
             ->first();
 
         $subject = $template ? $template->subject : "Update regarding {$event->title}";
-        $body = $template ? $template->body_template : "Hello {{participant_name}}, your registration status for {{event_name}} is {{registration_status}}.";
+        $body = $template ? $template->body_template : 'Hello {{participant_name}}, your registration status for {{event_name}} is {{registration_status}}.';
 
         $variables = [
             '{{participant_name}}' => $participant->name,
@@ -39,7 +39,7 @@ class NotificationService
             '{{event_location}}' => $event->venue_name ?? $event->address ?? 'TBD',
             '{{registration_status}}' => strtoupper($registration->status),
             '{{queue_position}}' => $registration->getQueuePosition() ? "#{$registration->getQueuePosition()}" : 'N/A',
-            '{{ticket_url}}' => config('app.url') . "/ticket/{$registration->ticket?->secure_token}",
+            '{{ticket_url}}' => config('app.url')."/ticket/{$registration->ticket?->secure_token}",
             '{{organizer_name}}' => $event->organizer_name ?? 'Event Team',
             '{{contact_email}}' => $event->contact_email ?? '',
             '{{contact_phone}}' => $event->contact_phone ?? '',

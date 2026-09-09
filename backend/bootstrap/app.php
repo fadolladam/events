@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\SecurityHeaders;
+use App\Modules\Auth\EventScopeMiddleware;
 use App\Modules\Auth\RoleMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -39,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'event.scope' => EventScopeMiddleware::class,
         ]);
 
         // Security headers on every response (SPA HTML, API JSON, /storage).

@@ -18,6 +18,12 @@ class EventController extends Controller
     {
         $query = Event::query()->with(['category', 'owner']);
 
+        // Non org-wide roles only see events they are assigned to.
+        $user = $request->user();
+        if ($user && ! $user->isEventAdmin()) {
+            $query->whereIn('id', $user->eventStaff()->pluck('event_id'));
+        }
+
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }

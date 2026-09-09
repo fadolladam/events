@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Event;
+use App\Models\EventStaff;
 use App\Models\Registration;
 use App\Models\User;
 use App\Modules\Registration\RegistrationService;
@@ -15,23 +16,25 @@ class ManualRegistrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    private ?User $officer = null;
+
     private function actingOfficer(): User
     {
-        $user = User::create([
+        $this->officer = User::create([
             'name' => 'Reg Officer',
             'email' => 'officer@rhbgroup.com',
             'password' => Hash::make('x'),
             'role' => 'registration_officer',
             'status' => 'active',
         ]);
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($this->officer);
 
-        return $user;
+        return $this->officer;
     }
 
     private function makeEvent(array $overrides = []): Event
     {
-        return Event::create(array_merge([
+        $event = Event::create(array_merge([
             'title' => 'Manual Reg Event',
             'slug' => 'manual-reg-event',
             'event_code' => 'MANUAL',
@@ -43,6 +46,17 @@ class ManualRegistrationTest extends TestCase
             'duplicate_rule' => 'email',
             'status' => 'registration_open',
         ], $overrides));
+
+        // Manual registration is event-scoped: the officer must be assigned.
+        if ($this->officer) {
+            EventStaff::create([
+                'event_id' => $event->id,
+                'user_id' => $this->officer->id,
+                'role' => 'registration_officer',
+            ]);
+        }
+
+        return $event;
     }
 
     public function test_officer_can_manually_register_a_participant_and_a_ticket_is_issued(): void

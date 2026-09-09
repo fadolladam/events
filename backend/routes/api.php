@@ -73,7 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
     /*
     | Read-only console access — every staff role
     */
-    Route::middleware(ROLE_STAFF)->group(function () {
+    Route::middleware([ROLE_STAFF, 'event.scope'])->group(function () {
         Route::get('/dashboard/stats', [ReportController::class, 'globalStats']);
         Route::get('/dashboard/overview', [DashboardController::class, 'overview']);
         Route::get('/events/{eventId}/analytics', [ReportController::class, 'eventStats']);
@@ -93,7 +93,7 @@ Route::middleware('auth:sanctum')->group(function () {
     /*
     | Event authoring & configuration — admins & organizers
     */
-    Route::middleware(ROLE_EVENT_MANAGER)->group(function () {
+    Route::middleware([ROLE_EVENT_MANAGER, 'event.scope'])->group(function () {
         Route::post('/events', [EventController::class, 'store']);
         Route::put('/events/{id}', [EventController::class, 'update']);
         Route::post('/events/{id}/duplicate', [EventController::class, 'duplicate']);
@@ -122,7 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
     /*
     | Registration & waitlist decisions — adds registration officers
     */
-    Route::middleware(ROLE_REGISTRATION)->group(function () {
+    Route::middleware([ROLE_REGISTRATION, 'event.scope'])->group(function () {
         Route::get('/events/{eventId}/registrations', [RegistrationController::class, 'indexForEvent']);
         Route::post('/events/{eventId}/registrations', [RegistrationController::class, 'storeManual'])->middleware('throttle:60,1');
         Route::get('/registrations/{id}', [RegistrationController::class, 'show']);
@@ -139,7 +139,7 @@ Route::middleware('auth:sanctum')->group(function () {
     /*
     | Onsite operations — adds check-in staff
     */
-    Route::middleware(ROLE_CHECKIN)->group(function () {
+    Route::middleware([ROLE_CHECKIN, 'event.scope'])->group(function () {
         // Generous limits — a busy gate scans continuously on event day.
         Route::post('/events/{eventId}/checkin/scan', [CheckInController::class, 'scan'])->middleware('throttle:240,1');
         Route::post('/events/{eventId}/checkin', [CheckInController::class, 'process'])->middleware('throttle:240,1');

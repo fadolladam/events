@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiClient, EventAttachment, EventCategory, EventItem } from '../../services/api';
 import { ImageUploadField } from '../../components/ImageUploadField';
 import { TimezoneSelect } from '../../components/TimezoneSelect';
@@ -20,6 +20,22 @@ const toLocalInput = (d: Date): string => {
 
 const nowLocalInput = (): string => toLocalInput(new Date());
 
+const DRAFT_KEY = 'rhb_event_wizard_draft';
+const readDraft = (): Record<string, unknown> | null => {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+  } catch {
+    return null;
+  }
+};
+const clearDraft = () => {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
 export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   isOpen,
   onClose,
@@ -34,6 +50,10 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [templateFormFields, setTemplateFormFields] = useState<unknown[]>([]);
+
+  const [draftDecided, setDraftDecided] = useState(true);
+  const [staffUsers, setStaffUsers] = useState<Array<{ id: number; name: string; email: string; role: string }>>([]);
+  const [staffAssignments, setStaffAssignments] = useState<Record<number, string>>({});
 
   // Form State
   const [title, setTitle] = useState('');
@@ -146,9 +166,71 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
     setMeetingUrl('');
     setOrganizerName('');
     setContactEmail('');
+    setStaffAssignments({});
+    // If a saved draft exists, hold autosave and offer to resume it.
+    setDraftDecided(readDraft() === null);
   }, [isOpen]);
 
+  // Load the staff picker options once per open.
+  useEffect(() => {
+    if (!isOpen) return;
+    apiClient.get('/users/assignable').then((r) => setStaffUsers(r.data.data || [])).catch(() => setStaffUsers([]));
+  }, [isOpen]);
+
+  const snapshot = () => ({
+    title, shortTitle, eventCode, description, coverImageUrl, attachments, categoryId, eventType, visibility, status,
+    startDate, endDate, regOpenAt, regCloseAt, timezone, capacity, waitlistEnabled, waitlistCapacity, approvalMode,
+    duplicateRule, allowCancellation, venueName, address, city, mapUrl, meetingUrl, organizerName, contactEmail,
+    staffAssignments, currentStep,
+  });
+
+  const applySnapshot = (d: Record<string, any>) => {
+    const s = <T,>(fn: (v: T) => void, v: T | undefined) => { if (v !== undefined) fn(v); };
+    s(setTitle, d.title); s(setShortTitle, d.shortTitle); s(setEventCode, d.eventCode); s(setDescription, d.description);
+    s(setCoverImageUrl, d.coverImageUrl); s(setAttachments, d.attachments); s(setCategoryId, d.categoryId);
+    s(setEventType, d.eventType); s(setVisibility, d.visibility); s(setStatus, d.status);
+    s(setStartDate, d.startDate); s(setEndDate, d.endDate); s(setRegOpenAt, d.regOpenAt); s(setRegCloseAt, d.regCloseAt);
+    s(setTimezone, d.timezone); s(setCapacity, d.capacity); s(setWaitlistEnabled, d.waitlistEnabled);
+    s(setWaitlistCapacity, d.waitlistCapacity); s(setApprovalMode, d.approvalMode); s(setDuplicateRule, d.duplicateRule);
+    s(setAllowCancellation, d.allowCancellation); s(setVenueName, d.venueName); s(setAddress, d.address);
+    s(setCity, d.city); s(setMapUrl, d.mapUrl); s(setMeetingUrl, d.meetingUrl); s(setOrganizerName, d.organizerName);
+    s(setContactEmail, d.contactEmail); s(setStaffAssignments, d.staffAssignments); s(setCurrentStep, d.currentStep);
+  };
+
+  const snapRef = useRef(snapshot);
+  snapRef.current = snapshot;
+  useEffect(() => {
+    if (!isOpen || !draftDecided) return;
+    const id = window.setInterval(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(snapRef.current()));
+      } catch {
+        /* storage disabled */
+      }
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [isOpen, draftDecided]);
+
   if (!isOpen) return null;
+
+  /** Per-step validation — returns a message when the step can't be left. */
+  const stepError = (step: number): string | null => {
+    if (step === 1) {
+      if (!title.trim()) return 'Please provide an event title.';
+    }
+    if (step === 2) {
+      const s = new Date(startDate).getTime();
+      const e = new Date(endDate).getTime();
+      if (Number.isNaN(s) || Number.isNaN(e)) return 'Set a valid start and end date/time.';
+      if (s < Date.now() - 60_000) return 'The start date/time is in the past.';
+      if (e <= s) return 'The end must be after the start.';
+    }
+    if (step === 3) {
+      if (!Number(capacity) || Number(capacity) < 1) return 'Capacity must be at least 1.';
+      if (waitlistEnabled && waitlistCapacity !== '' && Number(waitlistCapacity) < 1) return 'Waitlist capacity must be at least 1, or leave it blank for unlimited.';
+    }
+    return null;
+  };
 
   // Keep the event duration when the start moves, and never let end <= start.
   const handleStartChange = (value: string) => {
@@ -246,6 +328,19 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
         }
       }
 
+      // Apply any staff picked during the wizard.
+      const staff = Object.entries(staffAssignments)
+        .filter(([, role]) => role)
+        .map(([user_id, role]) => ({ user_id: Number(user_id), role }));
+      if (staff.length > 0) {
+        try {
+          await apiClient.put(`/events/${res.data.id}/staff`, { staff });
+        } catch {
+          /* event exists; staff can be set from its console */
+        }
+      }
+
+      clearDraft();
       onEventCreated(res.data);
       onClose();
     } catch (err: any) {
@@ -282,6 +377,25 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
 
         {/* Body Content */}
         <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
+          {!draftDecided && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <span className="font-semibold">You have an unfinished event draft.</span>
+              <span className="flex gap-2">
+                <button
+                  onClick={() => { const d = readDraft(); if (d) applySnapshot(d); setDraftDecided(true); }}
+                  className="rounded-lg bg-amber-600 px-2.5 py-1 font-bold text-white hover:bg-amber-500"
+                >
+                  Resume draft
+                </button>
+                <button
+                  onClick={() => { clearDraft(); setDraftDecided(true); }}
+                  className="rounded-lg border border-amber-300 px-2.5 py-1 font-bold text-amber-700 hover:bg-amber-100"
+                >
+                  Start fresh
+                </button>
+              </span>
+            </div>
+          )}
           {error && (
             <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
               {error}
@@ -759,6 +873,44 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
                   <option value="draft">Save as Draft (Preparation Mode)</option>
                 </select>
               </div>
+
+              {staffUsers.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Event team (optional)
+                  </label>
+                  <p className="mb-2 text-[11px] text-slate-400">
+                    Assign colleagues now so they can reach this event straight away. You can change this later.
+                  </p>
+                  <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2">
+                    {staffUsers.map((u) => (
+                      <div key={u.id} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate">
+                          <span className="font-semibold text-slate-800">{u.name}</span>
+                          <span className="text-slate-400"> · {u.email}</span>
+                        </span>
+                        <select
+                          value={staffAssignments[u.id] || ''}
+                          onChange={(e) =>
+                            setStaffAssignments((p) => {
+                              const next = { ...p };
+                              if (e.target.value) next[u.id] = e.target.value;
+                              else delete next[u.id];
+                              return next;
+                            })
+                          }
+                          className="shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-1"
+                        >
+                          <option value="">—</option>
+                          {['owner', 'manager', 'organizer', 'registration_officer', 'checkin_staff', 'viewer'].map((r) => (
+                            <option key={r} value={r}>{r.replace('_', ' ')}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -780,8 +932,9 @@ export const EventWizardModal: React.FC<EventWizardModalProps> = ({
           {currentStep < 4 ? (
             <button
               onClick={() => {
-                if (currentStep === 1 && !title) {
-                  setError('Please provide an event title.');
+                const msg = stepError(currentStep);
+                if (msg) {
+                  setError(msg);
                   return;
                 }
                 setError(null);

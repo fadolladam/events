@@ -265,6 +265,17 @@ class AuthController extends Controller
         return response()->json(['message' => 'The user must set a new password on next sign-in.']);
     }
 
+    /** Lean list of staff-eligible accounts for event-team pickers. */
+    public function assignable(Request $request): JsonResponse
+    {
+        $rows = User::where('role', '!=', 'participant')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role']);
+
+        return response()->json(['data' => $rows]);
+    }
+
     public function users(Request $request): JsonResponse
     {
         $query = User::query();

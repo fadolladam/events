@@ -7,6 +7,7 @@ use App\Modules\CheckIn\CheckInController;
 use App\Modules\Dashboard\DashboardController;
 use App\Modules\Events\EventCategoryController;
 use App\Modules\Events\EventController;
+use App\Modules\Events\EventStaffController;
 use App\Modules\Events\EventTemplateController;
 use App\Modules\Forms\FormBuilderController;
 use App\Modules\Forms\FormTemplateController;
@@ -101,6 +102,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/events/{id}', [EventController::class, 'update']);
         Route::post('/events/{id}/duplicate', [EventController::class, 'duplicate']);
         Route::patch('/events/{id}/status', [EventController::class, 'setStatus']);
+        Route::get('/events/{eventId}/staff', [EventStaffController::class, 'index']);
+        Route::put('/events/{eventId}/staff', [EventStaffController::class, 'sync']);
+        Route::get('/users/assignable', [AuthController::class, 'assignable']);
 
         Route::post('/categories', [EventCategoryController::class, 'store']);
         Route::post('/templates', [EventTemplateController::class, 'store']);

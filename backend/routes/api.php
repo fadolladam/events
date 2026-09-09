@@ -182,6 +182,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/users', [AuthController::class, 'users']);
         Route::post('/users', [AuthController::class, 'storeUser'])->middleware('throttle:20,1');
+        Route::patch('/users/{id}', [AuthController::class, 'updateUser'])->middleware('throttle:30,1');
         Route::post('/users/{id}/force-password-reset', [AuthController::class, 'forcePasswordReset'])->middleware('throttle:20,1');
     });
 });

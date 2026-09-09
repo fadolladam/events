@@ -18,6 +18,7 @@ import { EventsManagement } from './modules/admin/EventsManagement';
 import { EventDetailManage } from './modules/admin/EventDetailManage';
 import { AuditLogsPage } from './modules/audit/AuditLogsPage';
 import { ParticipantsPage } from './modules/admin/ParticipantsPage';
+import { UsersPage } from './modules/admin/UsersPage';
 
 /* -------- /login -------- */
 const LoginRoute: React.FC = () => {
@@ -65,6 +66,7 @@ export const App: React.FC = () => (
           <Route path="participants" element={<ParticipantsPage />} />
         </Route>
         <Route element={<RequireRole allow={ROLE_TIERS.governance} />}>
+          <Route path="users" element={<UsersPage />} />
           <Route path="audit" element={<AuditLogsPage />} />
         </Route>
       </Route>

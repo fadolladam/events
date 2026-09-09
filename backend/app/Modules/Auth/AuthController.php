@@ -276,6 +276,48 @@ class AuthController extends Controller
         return response()->json(['data' => $rows]);
     }
 
+    /**
+     * Governance: edit an existing account's name / phone / role / status.
+     * Guards against privilege escalation and self-lockout.
+     */
+    public function updateUser(Request $request, string $id): JsonResponse
+    {
+        $target = User::findOrFail($id);
+        $actor = $request->user();
+
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'phone' => 'sometimes|nullable|string|max:50',
+            'role' => 'sometimes|required|string|in:super_admin,event_admin,event_organizer,registration_officer,checkin_staff,viewer,participant',
+            'status' => 'sometimes|required|string|in:active,inactive',
+        ]);
+
+        if (($target->role === 'super_admin' || ($validated['role'] ?? null) === 'super_admin') && $actor->role !== 'super_admin') {
+            return response()->json(['message' => 'Only a super admin can manage a super admin account.'], 403);
+        }
+        if ($target->id === $actor->id && (($validated['status'] ?? 'active') === 'inactive' || ($validated['role'] ?? $actor->role) !== $actor->role)) {
+            return response()->json(['message' => 'You cannot change your own role or deactivate yourself.'], 422);
+        }
+
+        $before = $target->only(['name', 'phone', 'role', 'status']);
+        $target->fill($validated)->save();
+
+        // A deactivated user's live sessions/tokens are dropped.
+        if (($validated['status'] ?? null) === 'inactive') {
+            $target->tokens()->delete();
+        }
+
+        AuditService::log(
+            action: 'user_updated',
+            entityType: 'User',
+            entityId: (string) $target->id,
+            previousValue: $before,
+            newValue: $target->only(['name', 'phone', 'role', 'status']),
+        );
+
+        return response()->json(['user' => $target->fresh()]);
+    }
+
     public function users(Request $request): JsonResponse
     {
         $query = User::query();

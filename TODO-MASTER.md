@@ -29,6 +29,13 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #28 Event lifecycle guards | ✅ `EventService` now enforces a status-transition map on both `changeStatus()` and the generic `updateEvent()` payload; invalid moves → 422. Tests added. |
 | 2026-09-09 | #56 Seed all 5 roles | ✅ `DatabaseSeeder` now creates event_organizer + registration_officer (was 3 accounts) and wires them into `event_staff`; README claim is now accurate. |
 | 2026-09-09 | #2 Admin manual registration | ✅ `POST /events/{id}/registrations` (registration-officer tier) → same `RegistrationService::register()` (source=`manual`); `ManualRegistrationModal` + "Add participant" button on the Registrations tab; `registration_manual_created` audit; `ManualRegistrationTest`. **Tier 0 complete.** |
+| 2026-09-09 | #14 Security headers | ✅ `SecurityHeaders` middleware (global) — CSP / XFO / nosniff / Referrer-Policy / Permissions-Policy (camera=self) / COOP / HSTS(https). `config/security.php` env toggles. `SecurityHeadersTest`. |
+| 2026-09-09 | #6 Login protection | ✅ **complete** — added per-email+IP `RateLimiter` lockout (5 fails → 15 min → 429; correct password still refused during lockout; cleared on success), `user_login_locked_out` audit. `LoginThrottleTest`. |
+| 2026-09-09 | #15 Upload hardening | ✅ `MediaController` — `getimagesize()` header authoritative for type+extension (client filename ignored), 6000px cap, UUID filename, jpeg/png/webp/gif allow-list. `UploadSecurityTest`. |
+| 2026-09-09 | #16 Token / QR | ◐ cancelling a registration now **revokes its ticket** (`RegistrationService`); verified cross-event / forged-token / no-PII. `TicketSecurityTest`. Follow-up: `ticket_code` (8 rand chars) is weaker than `secure_token` — consider dropping it as a scan key. |
+| 2026-09-09 | #9 Per-event authorization | ✅ `EventScopeMiddleware` (`event.scope`) on the 4 protected groups; org-wide roles unchanged, scoped roles limited to `event_staff` events; `EventController::index` filtered. `EventScopeAuthorizationTest`. |
+| 2026-09-09 | #10 IDOR | ✅ registration-id routes resolve the parent event + apply the scope check; public token routes already object-scoped. |
+| 2026-09-09 | #11 RBAC matrix | ◐ `RBAC-MATRIX.md` written (endpoint × role × event-scope). Follow-up: exhaustive automated endpoint×7-role suite (E§49). |
 
 ---
 
@@ -37,7 +44,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | Tier | Done | Partial | Open / N-A |
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
-| 1 Security | #13 | #6, #17 | #4, #5, #7, #8, #9, #10, #11, #12, #14, #15, #16 |
+| **1 Security** | #6, #9, #10, #13, #14, #15 | #11, #16, #17 | #4, #5, #7, #8, #12 |
 | 2 Core | #23, #27 | #28 | #18–#22, #24, #25, #26, #29, #30 |
 | 3 Admin/Dash | #27 | #42, #43 | #31–#41 (#40 ❌) |
 | 4 Production | #37, #51 | #44, #46, #52 | #38, #39, #41, #45, #47–#50, #53–#55 |
@@ -90,18 +97,19 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   seam for Microsoft Entra ID; no hard-coded RHB infra. _E§5_
 
 ### Authorization
-- ☐ **9. Per-event authorization** — Laravel Policies/Gates evaluating
-  `global role + event_staff assignment + action`. Wire the already-existing
-  `User::canManageEvent()` (currently called nowhere). Cover: event edit/delete,
-  registrations, waitlist, attendance, check-in, reports, exports, settings,
-  staff management. _PRD §39 · E§7_
-- ☐ **10. IDOR / object-level audit** — every `{id}` route (registration, ticket,
-  user, event) must authorize the object, not just the role. Today
-  `GET /registrations/{id}`, waitlist, attendance, reports scope by role only.
-  _E§8_
-- ☐ **11. RBAC permission matrix** — write the endpoint × role matrix
-  (200 / 401 / 403) and back it with automated tests for all 7 roles +
-  unauthenticated. _E§6, §49_
+- ✅ **9. Per-event authorization** — `EventScopeMiddleware` (alias `event.scope`)
+  on the STAFF / EVENT_MANAGER / REGISTRATION / CHECKIN groups, using the
+  existing `User::canManageEvent()`. Org-wide roles unchanged; scoped roles
+  limited to their `event_staff` events (403 otherwise). `EventController::index`
+  filtered to assigned events. `EventScopeAuthorizationTest`. NOTE: chose a
+  single scope middleware over 11-ability Policies to keep controllers thin —
+  revisit if fine-grained per-ability rules are needed. _PRD §39 · E§7_
+- ✅ **10. IDOR / object-level** — `/registrations/{id}` (+approve/reject/cancel)
+  and `/waitlist/{registrationId}/priority` resolve the parent event and run the
+  same scope check; public token routes already object-scoped. _E§8_
+- ◐ **11. RBAC permission matrix** — `RBAC-MATRIX.md` written (endpoint × role ×
+  event-scope, authoritative next to `routes/api.php`). OPEN: exhaustive
+  automated endpoint × 7-role suite asserting 200/401/403 (E§49). _E§6, §49_
 
 ### API / data protection
 - ☐ **12. API Resources / DTOs** — stop returning raw Eloquent models; least-
@@ -111,15 +119,22 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   ticket lookup 30/min, QR image 60/min, check-in scan/process 240/min,
   undo/search 120/min, CSV/PDF export 20/min, `POST /users` 20/min. Check-in
   limits deliberately generous for event day. _E§12_
-- ☐ **14. Security headers** — CSP (Vite-compatible), HSTS,
-  X-Content-Type-Options, Referrer-Policy, Permissions-Policy, frame-ancestors.
-  No header layer exists today. _E§13_
-- ☐ **15. Upload hardening** — content sniffing, image re-encode / EXIF strip,
-  dimension checks, random server filenames, block double extensions / scripts /
-  traversal / overwrite. Currently just Laravel `image` + size. _PRD §71 · E§11_
-- ☐ **16. Token / QR security verification** — confirm + test: CSPRNG & length
-  (OK today: `Str::random(48)` / `(64)`), no PII in QR (OK), revoke tokens on
-  cancel, cross-event / revoked-reuse / duplicate-race all rejected. _E§9, §10_
+- ✅ **14. Security headers** — `App\Http\Middleware\SecurityHeaders` (global):
+  same-origin CSP (+ `data:`/`blob:` images, `camera=(self)` for the QR
+  scanner), X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy,
+  Permissions-Policy, COOP, HSTS on HTTPS only. `config/security.php` env
+  toggles. `SecurityHeadersTest`. _E§13_
+- ✅ **15. Upload hardening** — `MediaController`: `getimagesize()` header is
+  authoritative for type + written extension (client filename ignored),
+  dimensions capped 6000px, UUID filename (no overwrite/traversal),
+  jpeg/png/webp/gif allow-list. `UploadSecurityTest`. Optional follow-up:
+  re-encode / EXIF strip. _PRD §71 · E§11_
+- ◐ **16. Token / QR** — cancelling a registration now **revokes its ticket**
+  (`RegistrationService::cancelRegistration`), so a cancelled seat's QR stops
+  scanning. Verified: forged token / cross-event ticket rejected, no PII in
+  `qr_payload`. `TicketSecurityTest`. OPEN: `ticket_code` (8 random chars) is a
+  weaker scan key than `secure_token` (64) — consider removing it as an
+  accepted key. _E§9, §10_
 
 ### Audit
 - ◐ **17. Expand audit trail** — DONE: `user_login_failed`, `event_deleted`

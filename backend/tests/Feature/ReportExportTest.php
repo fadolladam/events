@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Event;
 use App\Models\FormField;
 use App\Models\RegistrationForm;
@@ -60,6 +61,21 @@ class ReportExportTest extends TestCase
         $this->assertStringNotContainsString('Bob', $body2);
 
         $this->assertDatabaseHas('audit_logs', ['action' => 'report_exported']);
+    }
+
+    public function test_pdf_export_renders_and_records_the_filters(): void
+    {
+        $this->admin();
+        $e = $this->event();
+        app(RegistrationService::class)->register($e->id, ['name' => 'Alice', 'email' => 'alice@t.com', 'department' => 'Treasury'], ['tshirt' => ['label' => 'T-shirt', 'value' => 'M']]);
+
+        $res = $this->get("/api/events/{$e->id}/export/pdf?department=Treasury");
+        $res->assertOk();
+        $this->assertSame('application/pdf', $res->headers->get('content-type'));
+
+        $log = AuditLog::where('action', 'report_exported')->latest()->first();
+        $this->assertSame('pdf', $log->new_value['format']);
+        $this->assertSame('Treasury', $log->new_value['filters']['department']);
     }
 
     public function test_event_analytics_include_department_and_answer_summary(): void

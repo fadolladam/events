@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../services/api';
+import { toast } from '../../components/uiFeedback';
 import { Save, Loader2, UserCog } from 'lucide-react';
 
 interface Props {
@@ -68,7 +69,7 @@ export const EventStaffTab: React.FC<Props> = ({ eventId, canManage }) => {
       setFlash('Team updated.');
       window.setTimeout(() => setFlash(null), 4000);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not save the team.');
+      toast(err.response?.data?.message || 'Could not save the team.', 'error');
     } finally {
       setSaving(false);
     }

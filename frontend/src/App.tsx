@@ -12,6 +12,7 @@ import {
   TicketRoute,
 } from './routes/publicRoutes';
 import { LoginPage } from './modules/auth/LoginPage';
+import { FeedbackHost } from './components/uiFeedback';
 import { AdminLayout } from './components/AdminLayout';
 import { GlobalDashboard } from './modules/admin/GlobalDashboard';
 import { EventsManagement } from './modules/admin/EventsManagement';
@@ -44,7 +45,9 @@ const LoginRoute: React.FC = () => {
 };
 
 export const App: React.FC = () => (
-  <Routes>
+  <>
+    <FeedbackHost />
+    <Routes>
     {/* Public */}
     <Route path={paths.catalog()} element={<CatalogRoute />} />
     <Route path="/events/:slug" element={<PublicEventRoute />} />
@@ -77,5 +80,6 @@ export const App: React.FC = () => (
     </Route>
 
     <Route path="*" element={<NotFound />} />
-  </Routes>
+    </Routes>
+  </>
 );

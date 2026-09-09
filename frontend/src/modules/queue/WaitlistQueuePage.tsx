@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, EventItem, Registration } from '../../services/api';
+import { toast } from '../../components/uiFeedback';
 import { Clock, Users, ArrowUpCircle, ShieldCheck, History, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
@@ -52,7 +53,7 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
       setMessage(res.data.message || 'Promotion check executed.');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to promote waitlisted attendees.');
+      toast(err.response?.data?.message || 'Failed to promote waitlisted attendees.', 'error');
     } finally {
       setPromoting(false);
     }
@@ -69,7 +70,7 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
       setMessage('Removed from the waiting list.');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to remove this person from the queue.');
+      toast(err.response?.data?.message || 'Failed to remove this person from the queue.', 'error');
     } finally {
       setRemoving(false);
     }
@@ -80,7 +81,7 @@ export const WaitlistQueuePage: React.FC<WaitlistQueuePageProps> = ({ eventId, o
       await apiClient.patch(`/waitlist/${registrationId}/priority`, { priority: newPriority });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update priority.');
+      toast(err.response?.data?.message || 'Failed to update priority.', 'error');
     }
   };
 

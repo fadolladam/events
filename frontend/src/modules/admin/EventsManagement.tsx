@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toast, confirmDialog } from '../../components/uiFeedback';
 import { apiClient, EventItem, getStoredUser, ROLE_TIERS, hasRole } from '../../services/api';
 import { Plus, Search, QrCode, Clock, Copy, Trash2 } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
@@ -53,25 +54,25 @@ export const EventsManagement: React.FC = () => {
 
   const handleDuplicate = async (e: React.MouseEvent, eventId: string) => {
     e.stopPropagation();
-    if (!confirm('Duplicate this event configuration, settings, and form fields?')) return;
+    if (!await confirmDialog('Duplicate this event configuration, settings, and form fields?')) return;
 
     try {
       await apiClient.post(`/events/${eventId}/duplicate`);
       fetchEvents();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to duplicate event.');
+      toast(err.response?.data?.message || 'Failed to duplicate event.', 'error');
     }
   };
 
   const handleDelete = async (e: React.MouseEvent, eventId: string) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete or archive this event?')) return;
+    if (!await confirmDialog('Are you sure you want to delete or archive this event?')) return;
 
     try {
       await apiClient.delete(`/events/${eventId}`);
       fetchEvents();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to delete event.');
+      toast(err.response?.data?.message || 'Failed to delete event.', 'error');
     }
   };
 

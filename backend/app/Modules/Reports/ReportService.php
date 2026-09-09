@@ -402,15 +402,35 @@ class ReportService
         ]);
     }
 
-    public function exportPdfReport(string $eventId): Response
+    public function exportPdfReport(string $eventId, ?Request $request = null): Response
     {
+        $request ??= request();
         $event = Event::findOrFail($eventId);
+        $tz = $event->timezone ?: config('app.timezone');
         $analytics = $this->getEventAnalytics($eventId);
-        $registrations = Registration::where('event_id', $eventId)
-            ->with('participant')
-            ->orderBy('registration_sequence', 'asc')
-            ->limit(100)
-            ->get();
+
+        $regQuery = Registration::where('event_id', $eventId)->with(['participant', 'answers']);
+        RegistrationFilters::apply($regQuery, $request);
+        $registrations = $regQuery->orderBy('registration_sequence', 'asc')->limit(500)->get();
+
+        $filterNote = collect($request->only(['status', 'attendance_status', 'checked_in', 'department', 'date_from', 'date_to', 'search']))
+            ->filter()
+            ->map(fn ($v, $k) => "{$k}={$v}")
+            ->implode(', ');
+
+        $deptRows = '';
+        foreach ($analytics['departments'] as $d) {
+            $deptRows .= "<tr><td>{$d['department']}</td><td style='text-align:right'>{$d['count']}</td></tr>";
+        }
+
+        $answerBlocks = '';
+        foreach ($analytics['answer_summary'] as $f) {
+            $opts = '';
+            foreach ($f['options'] as $o) {
+                $opts .= "<tr><td>{$o['value']}</td><td style='text-align:right'>{$o['count']}</td></tr>";
+            }
+            $answerBlocks .= "<h4>{$f['label']}</h4><table class='table'><tbody>{$opts}</tbody></table>";
+        }
 
         $html = "
         <!DOCTYPE html>
@@ -432,7 +452,8 @@ class ReportService
         </head>
         <body>
             <h1>{$event->title} ({$event->event_code})</h1>
-            <div class='subtitle'>Generated on ".date('d M Y, H:i').' | Status: '.strtoupper($event->calculateDynamicStatus())."</div>
+            <div class='subtitle'>Generated ".Carbon::now($tz)->format('d M Y, H:i')." ({$tz}) | Status: ".strtoupper($event->calculateDynamicStatus()).'</div>
+            '.($filterNote ? "<div class='subtitle'>Filtered: {$filterNote}</div>" : '')."
 
             <table class='kpi-table'>
                 <tr>
@@ -440,11 +461,15 @@ class ReportService
                     <td><div class='kpi-val'>{$analytics['confirmed']}</div><div class='kpi-lbl'>Confirmed</div></td>
                     <td><div class='kpi-val'>{$analytics['waitlisted']}</div><div class='kpi-lbl'>Waitlist</div></td>
                     <td><div class='kpi-val'>{$analytics['checked_in']}</div><div class='kpi-lbl'>Checked In</div></td>
+                    <td><div class='kpi-val'>{$analytics['no_show']}</div><div class='kpi-lbl'>No-show</div></td>
                     <td><div class='kpi-val'>{$analytics['attendance_rate']}%</div><div class='kpi-lbl'>Attendance Rate</div></td>
                 </tr>
             </table>
 
-            <h3>Attendee Summary (Top Registrations)</h3>
+            ".($deptRows ? "<h3>Department Breakdown</h3><table class='table'><tbody>{$deptRows}</tbody></table>" : '').'
+            '.($answerBlocks ? "<h3>Form Answers</h3>{$answerBlocks}" : '').'
+
+            <h3>Attendee List ('.count($registrations).")</h3>
             <table class='table'>
                 <thead>
                     <tr>

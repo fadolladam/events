@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, Registration, EventItem } from '../../services/api';
+import { toast } from '../../components/uiFeedback';
 import { CheckCircle2, Clock, XCircle, ArrowLeft, Search, Filter } from 'lucide-react';
 
 interface AttendanceRosterProps {
@@ -46,7 +47,7 @@ export const AttendanceRoster: React.FC<AttendanceRosterProps> = ({ eventId, onB
       });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update attendance status.');
+      toast(err.response?.data?.message || 'Failed to update attendance status.', 'error');
     }
   };
 

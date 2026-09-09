@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, getStoredUser } from '../../services/api';
+import { toast, confirmDialog } from '../../components/uiFeedback';
 import { Search, UserPlus, X, KeyRound, RefreshCw } from 'lucide-react';
 
 interface ManagedUser {
@@ -50,12 +51,12 @@ export const UsersPage: React.FC = () => {
   useEffect(load, [page, debounced, roleFilter]);
 
   const forceReset = async (u: ManagedUser) => {
-    if (!confirm(`Force ${u.name} to set a new password on next sign-in? Their sessions end now.`)) return;
+    if (!await confirmDialog(`Force ${u.name} to set a new password on next sign-in? Their sessions end now.`)) return;
     try {
       await apiClient.post(`/users/${u.id}/force-password-reset`);
       load();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed.');
+      toast(err.response?.data?.message || 'Failed.', 'error');
     }
   };
 

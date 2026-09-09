@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { toast, confirmDialog } from '../../components/uiFeedback';
 import { apiClient, EventItem, Registration, getStoredUser, ROLE_TIERS, hasRole } from '../../services/api';
 import { paths } from '../../routes/paths';
 import { QrScannerConsole } from '../checkin/QrScannerConsole';
@@ -184,9 +185,9 @@ export const EventDetailManage: React.FC = () => {
     if (!name || !name.trim()) return;
     try {
       await apiClient.post(`/events/${eventUuid}/save-as-template`, { name: name.trim() });
-      alert('Saved. It now appears in the "Start from a template" list when creating an event.');
+      toast('Saved. It now appears in the "Start from a template" list when creating an event.');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not save the template.');
+      toast(err.response?.data?.message || 'Could not save the template.', 'error');
     }
   };
 
@@ -195,7 +196,7 @@ export const EventDetailManage: React.FC = () => {
       await apiClient.patch(`/events/${eventUuid}/status`, { status: newStatus });
       fetchEvent();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update status.');
+      toast(err.response?.data?.message || 'Failed to update status.', 'error');
     }
   };
 
@@ -211,7 +212,7 @@ export const EventDetailManage: React.FC = () => {
       setCancelTarget(null);
       await Promise.all([fetchRegistrations(eventUuid, regPage, regPerPage), fetchEvent()]);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to cancel this registration.');
+      toast(err.response?.data?.message || 'Failed to cancel this registration.', 'error');
     } finally {
       setCancelling(false);
     }
@@ -230,7 +231,7 @@ export const EventDetailManage: React.FC = () => {
   const runBulk = async (action: 'approve' | 'reject' | 'cancel') => {
     const ids = Array.from(selectedRegIds);
     if (ids.length === 0) return;
-    if (action !== 'approve' && !confirm(`${action[0].toUpperCase()}${action.slice(1)} ${ids.length} selected registration(s)?`)) return;
+    if (action !== 'approve' && !await confirmDialog(`${action[0].toUpperCase()}${action.slice(1)} ${ids.length} selected registration(s)?`)) return;
     setBulkBusy(true);
     try {
       const res = await apiClient.post(`/events/${eventUuid}/registrations/bulk`, { action, ids });
@@ -239,7 +240,7 @@ export const EventDetailManage: React.FC = () => {
       window.setTimeout(() => setRegFlash(null), 6000);
       await Promise.all([fetchRegistrations(eventUuid, regPage, regPerPage), fetchEvent()]);
     } catch (err: any) {
-      alert(err.response?.data?.message || `Bulk ${action} failed.`);
+      toast(err.response?.data?.message || `Bulk ${action} failed.`, 'error');
     } finally {
       setBulkBusy(false);
     }
@@ -252,7 +253,7 @@ export const EventDetailManage: React.FC = () => {
       window.setTimeout(() => setRegFlash(null), 6000);
       await fetchRegistrations(eventUuid, regPage, regPerPage);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not reissue the ticket.');
+      toast(err.response?.data?.message || 'Could not reissue the ticket.', 'error');
     }
   };
 
@@ -263,7 +264,7 @@ export const EventDetailManage: React.FC = () => {
       window.setTimeout(() => setRegFlash(null), 4000);
       await fetchRegistrations(eventUuid, regPage, regPerPage);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not save the note.');
+      toast(err.response?.data?.message || 'Could not save the note.', 'error');
     }
   };
 
@@ -508,18 +509,21 @@ export const EventDetailManage: React.FC = () => {
                     <Upload className="h-3.5 w-3.5" />
                     Import CSV
                   </button>
-                  <button
-                    onClick={() => {
-                      const p = new URLSearchParams();
-                      Object.entries(regFilters).forEach(([k, v]) => { if (v) p.set(k, v); });
-                      const qs = p.toString();
-                      window.open(`/api/events/${eventUuid}/export/csv${qs ? `?${qs}` : ''}`, '_blank');
-                    }}
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                  >
-                    <Upload className="h-3.5 w-3.5 rotate-180" />
-                    Export CSV
-                  </button>
+                  {(['csv', 'pdf'] as const).map((fmt) => (
+                    <button
+                      key={fmt}
+                      onClick={() => {
+                        const p = new URLSearchParams();
+                        Object.entries(regFilters).forEach(([k, v]) => { if (v) p.set(k, v); });
+                        const qs = p.toString();
+                        window.open(`/api/events/${eventUuid}/export/${fmt}${qs ? `?${qs}` : ''}`, '_blank');
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      <Upload className="h-3.5 w-3.5 rotate-180" />
+                      Export {fmt.toUpperCase()}
+                    </button>
+                  ))}
                 </>
               )}
               <label className="text-[11px] text-slate-400">Per page</label>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, ensureCsrf, Registration } from '../../services/api';
+import { toast } from '../../components/uiFeedback';
 import { Ticket as TicketIcon, Search, Calendar, MapPin, CheckCircle2, Clock, AlertTriangle, ArrowLeft, Download } from 'lucide-react';
 
 interface MyRegistrationPageProps {
@@ -72,7 +73,7 @@ export const MyRegistrationPage: React.FC<MyRegistrationPageProps> = ({
       setRegistration(res.data.registration);
       setCancelModal(false);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to cancel registration.');
+      toast(err.response?.data?.message || 'Failed to cancel registration.', 'error');
     } finally {
       setCancelling(false);
     }

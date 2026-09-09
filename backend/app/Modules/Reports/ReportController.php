@@ -41,16 +41,16 @@ class ReportController extends Controller
         return $this->reportService->exportCsv($eventId, $request);
     }
 
-    public function exportPdf(string $eventId): Response
+    public function exportPdf(Request $request, string $eventId): Response
     {
         AuditService::log(
             action: 'report_exported',
             entityType: 'Event',
             entityId: $eventId,
             eventId: $eventId,
-            newValue: ['format' => 'pdf'],
+            newValue: ['format' => 'pdf', 'filters' => $request->only(['status', 'attendance_status', 'checked_in', 'department', 'date_from', 'date_to', 'search'])],
         );
 
-        return $this->reportService->exportPdfReport($eventId);
+        return $this->reportService->exportPdfReport($eventId, $request);
     }
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, type FormTemplateSummary } from '../../services/api';
+import { toast, confirmDialog } from '../../components/uiFeedback';
 import { X, Trash2, Pencil, Check, Layers, ShieldCheck } from 'lucide-react';
 
 interface Props {
@@ -43,21 +44,21 @@ export const FormTemplatesModal: React.FC<Props> = ({ isOpen, onClose, onChanged
       await fetchTemplates();
       onChanged?.();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not rename the template.');
+      toast(err.response?.data?.message || 'Could not rename the template.', 'error');
     } finally {
       setBusyId(null);
     }
   };
 
   const remove = async (t: FormTemplateSummary) => {
-    if (!confirm(`Delete the reusable form "${t.name}"? Events already using it are not affected.`)) return;
+    if (!await confirmDialog(`Delete the reusable form "${t.name}"? Events already using it are not affected.`)) return;
     setBusyId(t.id);
     try {
       await apiClient.delete(`/forms/templates/${t.id}`);
       await fetchTemplates();
       onChanged?.();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not delete the template.');
+      toast(err.response?.data?.message || 'Could not delete the template.', 'error');
     } finally {
       setBusyId(null);
     }

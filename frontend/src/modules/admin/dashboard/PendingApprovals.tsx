@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiClient, ROLE_TIERS, hasRole } from '../../../services/api';
+import { toast } from '../../../components/uiFeedback';
 import type { DashboardOverview } from '../../../services/api';
 import { Section, StatTile, Th, Td } from './primitives';
 import { relTime, fmtDateTime } from './format';
@@ -20,7 +21,7 @@ export const PendingApprovals: React.FC<{
       setDone((d) => ({ ...d, [id]: action === 'approve' ? 'approved' : 'rejected' }));
       ctx.refetch();
     } catch (err: any) {
-      alert(err.response?.data?.message || `Failed to ${action} registration.`);
+      toast(err.response?.data?.message || `Failed to ${action} registration.`, 'error');
     } finally {
       setBusy(null);
     }

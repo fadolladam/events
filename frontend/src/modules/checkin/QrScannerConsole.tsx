@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiClient, EventItem, CheckinRecord } from '../../services/api';
+import { confirmDialog } from '../../components/uiFeedback';
 import { Html5Qrcode } from 'html5-qrcode';
 import { QrCode, Search, CheckCircle2, AlertTriangle, ArrowLeft, Undo2, UserCheck, Camera, CameraOff, Upload } from 'lucide-react';
 
@@ -275,7 +276,7 @@ export const QrScannerConsole: React.FC<QrScannerConsoleProps> = ({ eventId, onB
   };
 
   const handleUndoCheckIn = async (regId: string) => {
-    if (!confirm('Undo check-in for this participant?')) return;
+    if (!await confirmDialog('Undo check-in for this participant?')) return;
     try {
       await apiClient.post(`/events/${eventId}/checkin/undo`, { registration_id: regId, reason: 'Staff manual reversal' });
       setStatusMessage({ type: 'success', text: 'Check-in undone successfully.' });

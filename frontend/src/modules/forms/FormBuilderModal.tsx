@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient, type FormField, type FormTemplateSummary } from '../../services/api';
+import { toast, confirmDialog } from '../../components/uiFeedback';
 import { X, Plus, Trash2, ArrowUp, ArrowDown, Save, CheckCircle2, Layers, BookmarkPlus, GripVertical, Eye } from 'lucide-react';
 import { fieldConditionPasses, type FieldCondition } from './conditionalLogic';
 import { FormTemplatesModal } from './FormTemplatesModal';
@@ -106,7 +107,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
   const removeField = (index: number) => {
     const field = fields[index];
     if (['full_name', 'email'].includes(field.field_key)) {
-      alert('Full Name and Email are mandatory core fields.');
+      toast('Full Name and Email are mandatory core fields.');
       return;
     }
     const updated = fields.filter((_, i) => i !== index);
@@ -136,7 +137,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
     // are on screen onto an event whose real form we never saw.
     if (loadError) return;
     if (dupKeys.size > 0) {
-      alert('Two fields share the same key. Rename one of the duplicated questions before saving.');
+      toast('Two fields share the same key. Rename one of the duplicated questions before saving.');
       return;
     }
     setSaving(true);
@@ -145,7 +146,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to save form structure.');
+      toast(err.response?.data?.message || 'Failed to save form structure.', 'error');
     } finally {
       setSaving(false);
     }
@@ -155,7 +156,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
   const loadTemplate = async () => {
     if (!selectedTemplateId || loadError) return;
     const tpl = templates.find((t) => String(t.id) === selectedTemplateId);
-    if (fields.length > 0 && !confirm(`Replace the current questions with "${tpl?.name}"?`)) return;
+    if (fields.length > 0 && !await confirmDialog(`Replace the current questions with "${tpl?.name}"?`)) return;
     setApplyingTemplate(true);
     try {
       const res = await apiClient.get(`/forms/templates/${selectedTemplateId}`);
@@ -166,7 +167,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
       }));
       setFields(loaded);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not load that reusable form.');
+      toast(err.response?.data?.message || 'Could not load that reusable form.', 'error');
     } finally {
       setApplyingTemplate(false);
     }
@@ -184,7 +185,7 @@ export const FormBuilderModal: React.FC<FormBuilderModalProps> = ({
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Could not save the reusable form.');
+      toast(err.response?.data?.message || 'Could not save the reusable form.', 'error');
     } finally {
       setSavingTemplate(false);
     }

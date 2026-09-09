@@ -5,11 +5,12 @@ import { useAuth } from '../services/auth';
 import { paths } from '../routes/paths';
 import { EventWizardModal } from '../modules/admin/EventWizardModal';
 import { BrandMark } from './BrandMark';
-import { LayoutDashboard, Calendar, ShieldCheck, LogOut, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, ShieldCheck, LogOut, ExternalLink } from 'lucide-react';
 
 const NAV_ITEMS: { to: string; label: string; icon: typeof LayoutDashboard; allow: readonly string[] }[] = [
   { to: paths.dashboard(), label: 'Dashboard', icon: LayoutDashboard, allow: ROLE_TIERS.staff },
   { to: paths.events(), label: 'Events & Operations', icon: Calendar, allow: ROLE_TIERS.staff },
+  { to: paths.participants(), label: 'Participants', icon: Users, allow: ROLE_TIERS.registration },
   { to: paths.audit(), label: 'System Audit Trails', icon: ShieldCheck, allow: ROLE_TIERS.governance },
 ];
 

@@ -17,6 +17,7 @@ import { GlobalDashboard } from './modules/admin/GlobalDashboard';
 import { EventsManagement } from './modules/admin/EventsManagement';
 import { EventDetailManage } from './modules/admin/EventDetailManage';
 import { AuditLogsPage } from './modules/audit/AuditLogsPage';
+import { ParticipantsPage } from './modules/admin/ParticipantsPage';
 
 /* -------- /login -------- */
 const LoginRoute: React.FC = () => {
@@ -60,6 +61,9 @@ export const App: React.FC = () => (
           element={<Navigate to={EVENT_TABS[0]} replace />}
         />
         <Route path="events/:slug/:tab" element={<EventDetailManage />} />
+        <Route element={<RequireRole allow={ROLE_TIERS.registration} />}>
+          <Route path="participants" element={<ParticipantsPage />} />
+        </Route>
         <Route element={<RequireRole allow={ROLE_TIERS.governance} />}>
           <Route path="audit" element={<AuditLogsPage />} />
         </Route>

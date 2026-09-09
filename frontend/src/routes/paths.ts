@@ -16,6 +16,7 @@ export const paths = {
   dashboard: () => '/admin/dashboard',
   events: (status?: string) => (status ? `/admin/events?status=${status}` : '/admin/events'),
   eventConsole: (slugOrId: string, tab: string = 'overview') => `/admin/events/${slugOrId}/${tab}`,
+  participants: () => '/admin/participants',
   audit: () => '/admin/audit',
 } as const;
 

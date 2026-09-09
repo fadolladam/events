@@ -1,6 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { apiClient, EventItem, FormField } from '../../services/api';
 import { X, UserPlus, Loader2 } from 'lucide-react';
+
+interface ParticipantHit {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  employee_id?: string | null;
+  department?: string | null;
+}
 
 interface Props {
   event: EventItem;
@@ -31,13 +40,44 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [suggestions, setSuggestions] = useState<ParticipantHit[]>([]);
+  const [pickedExisting, setPickedExisting] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
 
   const dynamicFields = useMemo<FormField[]>(
     () => (event.form?.fields || []).filter((f) => !CORE_KEYS.includes(f.field_key) && !f.is_hidden),
     [event.form],
   );
 
+  // Type-ahead against the participant directory.
+  useEffect(() => {
+    if (!isOpen || pickedExisting) return;
+    const q = (email.trim() || name.trim());
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      apiClient
+        .get('/participants/lookup', { params: { q } })
+        .then((res) => setSuggestions(res.data.data || []))
+        .catch(() => setSuggestions([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [name, email, isOpen, pickedExisting]);
+
   if (!isOpen) return null;
+
+  const applyHit = (h: ParticipantHit) => {
+    setName(h.name);
+    setEmail(h.email);
+    setPhone(h.phone || '');
+    setEmployeeId(h.employee_id || '');
+    setDepartment(h.department || '');
+    setPickedExisting(true);
+    setShowSuggest(false);
+    setSuggestions([]);
+  };
 
   const setAnswer = (key: string, label: string, value: any) =>
     setAnswers((prev) => ({ ...prev, [key]: { label, value } }));
@@ -45,6 +85,7 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
   const reset = () => {
     setName(''); setEmail(''); setPhone(''); setEmployeeId(''); setDepartment(''); setNotes('');
     setAnswers({}); setError(null); setFieldErrors({});
+    setSuggestions([]); setPickedExisting(false); setShowSuggest(false);
   };
 
   const handleClose = () => {
@@ -108,21 +149,56 @@ export const ManualRegistrationModal: React.FC<Props> = ({ event, isOpen, onClos
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-5">
+          {pickedExisting && (
+            <p className="flex items-center justify-between rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+              Using an existing participant record.
+              <button
+                type="button"
+                onClick={() => setPickedExisting(false)}
+                className="font-bold underline"
+              >
+                edit details
+              </button>
+            </p>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Full name" required error={fieldErrors.name}>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+              <div className="relative">
+                <input
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); setPickedExisting(false); setShowSuggest(true); }}
+                  onFocus={() => setShowSuggest(true)}
+                  onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+                  required
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                {showSuggest && suggestions.length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white text-xs shadow-lg">
+                    {suggestions.map((h) => (
+                      <li key={h.id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); applyHit(h); }}
+                          className="block w-full px-3 py-2 text-left hover:bg-slate-50"
+                        >
+                          <span className="font-semibold text-slate-900">{h.name}</span>
+                          <span className="text-slate-400"> · {h.email}</span>
+                          {h.employee_id && <span className="text-slate-400"> · {h.employee_id}</span>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </Field>
             <Field label="Email" required error={fieldErrors.email}>
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setPickedExisting(false); }}
                 required
+                autoComplete="off"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </Field>

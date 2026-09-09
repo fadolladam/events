@@ -12,6 +12,7 @@ use App\Modules\Forms\FormBuilderController;
 use App\Modules\Forms\FormTemplateController;
 use App\Modules\Media\MediaController;
 use App\Modules\Notifications\NotificationController;
+use App\Modules\Registration\ParticipantController;
 use App\Modules\Registration\RegistrationController;
 use App\Modules\Reports\ReportController;
 use App\Modules\Tickets\TicketController;
@@ -124,6 +125,11 @@ Route::middleware('auth:sanctum')->group(function () {
     | Registration & waitlist decisions — adds registration officers
     */
     Route::middleware([ROLE_REGISTRATION, 'event.scope'])->group(function () {
+        // Cross-event participant directory (not event-scoped).
+        Route::get('/participants', [ParticipantController::class, 'index']);
+        Route::get('/participants/lookup', [ParticipantController::class, 'lookup'])->middleware('throttle:60,1');
+        Route::get('/participants/{id}', [ParticipantController::class, 'show']);
+
         Route::get('/events/{eventId}/registrations', [RegistrationController::class, 'indexForEvent']);
         Route::post('/events/{eventId}/registrations', [RegistrationController::class, 'storeManual'])->middleware('throttle:60,1');
         Route::post('/events/{eventId}/registrations/bulk', [RegistrationController::class, 'bulk'])->middleware('throttle:30,1');

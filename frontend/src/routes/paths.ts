@@ -19,6 +19,7 @@ export const paths = {
   eventConsole: (slugOrId: string, tab: string = 'overview') => `/admin/events/${slugOrId}/${tab}`,
   participants: () => '/admin/participants',
   users: () => '/admin/users',
+  orgSettings: () => '/admin/settings',
   audit: () => '/admin/audit',
 } as const;
 

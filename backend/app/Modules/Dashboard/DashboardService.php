@@ -34,7 +34,13 @@ class DashboardService
     {
         [$from, $to, $range] = $this->resolveRange($filters);
 
-        $events = Event::query()->with('category:id,name,color')->get();
+        // Organization confinement — null for super_admin / unscoped accounts.
+        $orgId = auth()->user()?->scopedOrgId();
+
+        $events = Event::query()
+            ->when($orgId !== null, fn ($q) => $q->where('organization_id', $orgId))
+            ->with('category:id,name,color')
+            ->get();
 
         // ---- grouped aggregates (fixed query count) --------------------------
         $statusCounts = $this->groupedCounts('status');            // [event_id][status] => n

@@ -87,4 +87,15 @@ class User extends Authenticatable
 
         return $this->eventStaff()->where('event_id', $eventId)->exists();
     }
+
+    /**
+     * The organization this user's queries are confined to, or null for no
+     * confinement (super_admin, or an account with no organization_id — which
+     * includes test fixtures). Consumed by list endpoints, search and the
+     * dashboard to keep one org's data out of another's.
+     */
+    public function scopedOrgId(): ?int
+    {
+        return $this->isSuperAdmin() ? null : $this->organization_id;
+    }
 }

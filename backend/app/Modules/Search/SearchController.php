@@ -28,11 +28,13 @@ class SearchController extends Controller
         $user = $request->user();
         $orgWide = $user->isEventAdmin();
         $eventIds = $orgWide ? null : $user->eventStaff()->pluck('event_id');
+        $orgId = $user->scopedOrgId();
 
         $like = "%{$q}%";
 
         // Events
         $events = Event::query()
+            ->when($orgId !== null, fn ($b) => $b->where('organization_id', $orgId))
             ->when(! $orgWide, fn ($b) => $b->whereIn('id', $eventIds))
             ->where(fn ($b) => $b->where('title', 'like', $like)
                 ->orWhere('event_code', 'like', $like)
@@ -43,6 +45,7 @@ class SearchController extends Controller
 
         // Registrations
         $registrations = Registration::query()
+            ->when($orgId !== null, fn ($b) => $b->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)))
             ->when(! $orgWide, fn ($b) => $b->whereIn('event_id', $eventIds))
             ->where(fn ($b) => $b->where('registration_number', 'like', $like)
                 ->orWhereHas('participant', fn ($p) => $p->where('name', 'like', $like)
@@ -54,9 +57,10 @@ class SearchController extends Controller
             ->limit(self::PER_GROUP)
             ->get(['id', 'event_id', 'participant_id', 'registration_number', 'status']);
 
-        // Participants — org-wide: everyone; scoped: only those with a registration
-        // in an allowed event.
+        // Participants — org-wide within the organization; scoped roles only those
+        // with a registration in an allowed event.
         $participants = Participant::query()
+            ->when($orgId !== null, fn ($b) => $b->whereHas('registrations.event', fn ($e) => $e->where('organization_id', $orgId)))
             ->when(! $orgWide, fn ($b) => $b->whereHas('registrations', fn ($r) => $r->whereIn('event_id', $eventIds)))
             ->where(fn ($b) => $b->where('name', 'like', $like)
                 ->orWhere('email', 'like', $like)

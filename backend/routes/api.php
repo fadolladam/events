@@ -13,6 +13,7 @@ use App\Modules\Forms\FormBuilderController;
 use App\Modules\Forms\FormTemplateController;
 use App\Modules\Media\MediaController;
 use App\Modules\Notifications\NotificationController;
+use App\Modules\Organization\OrganizationController;
 use App\Modules\Registration\ParticipantController;
 use App\Modules\Registration\RegistrationController;
 use App\Modules\Reports\ReportController;
@@ -179,6 +180,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/events/{id}', [EventController::class, 'destroy']);
 
         Route::get('/audit-logs', [AuditController::class, 'index']);
+
+        Route::get('/organization', [OrganizationController::class, 'show']);
+        Route::put('/organization', [OrganizationController::class, 'update']);
 
         Route::get('/users', [AuthController::class, 'users']);
         Route::post('/users', [AuthController::class, 'storeUser'])->middleware('throttle:20,1');

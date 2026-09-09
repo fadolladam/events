@@ -13,8 +13,10 @@ use Symfony\Component\HttpFoundation\Response;
  * holds the right *kind* of role for the action; this decides whether they may
  * apply it to *this* event.
  *
- *  - super_admin / event_admin  → org-wide, every event.
- *  - everyone else              → only events they hold an event_staff row for.
+ *  - super_admin                → every event.
+ *  - event_admin                → every event in their own organization.
+ *  - everyone else              → only events they hold an event_staff row for
+ *                                 (and, if org-bound, in their organization).
  *
  * The event is resolved from whichever route parameter is present
  * (`eventId`, `registrationId`, or `id` on an events/registrations route).
@@ -31,13 +33,20 @@ class EventScopeMiddleware
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        if ($user->isEventAdmin()) {
-            return $next($request);
-        }
-
         $eventId = $this->resolveEventId($request);
 
         if ($eventId === null) {
+            return $next($request);
+        }
+
+        // Organization confinement — applies to everyone except super_admin.
+        $orgId = $user->scopedOrgId();
+        if ($orgId !== null && Event::whereKey($eventId)->value('organization_id') !== $orgId) {
+            return response()->json(['message' => 'You do not have access to this event.'], 403);
+        }
+
+        // event_admin: any event in their org (already checked above).
+        if ($user->isEventAdmin()) {
             return $next($request);
         }
 

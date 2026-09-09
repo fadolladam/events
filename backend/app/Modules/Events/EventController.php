@@ -18,8 +18,14 @@ class EventController extends Controller
     {
         $query = Event::query()->with(['category', 'owner']);
 
-        // Non org-wide roles only see events they are assigned to.
         $user = $request->user();
+
+        // Organization confinement (everyone except super_admin, when org-bound).
+        if ($user && ($orgId = $user->scopedOrgId()) !== null) {
+            $query->where('organization_id', $orgId);
+        }
+
+        // Non org-wide roles only see events they are assigned to.
         if ($user && ! $user->isEventAdmin()) {
             $query->whereIn('id', $user->eventStaff()->pluck('event_id'));
         }

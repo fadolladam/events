@@ -16,9 +16,15 @@ use Illuminate\Http\Request;
  */
 class ParticipantController extends Controller
 {
+    private function orgScope(Request $request): ?int
+    {
+        return $request->user()->scopedOrgId();
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $query = Participant::query()->withCount('registrations');
+        $query = Participant::query()->withCount('registrations')
+            ->when($this->orgScope($request), fn ($q, $org) => $q->whereHas('registrations.event', fn ($e) => $e->where('organization_id', $org)));
 
         if ($request->filled('search')) {
             $s = trim($request->input('search'));
@@ -51,6 +57,7 @@ class ParticipantController extends Controller
         }
 
         $rows = Participant::query()
+            ->when($this->orgScope($request), fn ($b, $org) => $b->whereHas('registrations.event', fn ($e) => $e->where('organization_id', $org)))
             ->where(function ($w) use ($q) {
                 $w->where('name', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
@@ -63,9 +70,11 @@ class ParticipantController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $participant = Participant::withCount('registrations')->findOrFail($id);
+        $participant = Participant::withCount('registrations')
+            ->when($this->orgScope($request), fn ($b, $org) => $b->whereHas('registrations.event', fn ($e) => $e->where('organization_id', $org)))
+            ->findOrFail($id);
 
         $participant->setRelation(
             'registrations',

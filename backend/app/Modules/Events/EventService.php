@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventStaff;
 use App\Models\FormField;
 use App\Models\RegistrationForm;
+use App\Models\User;
 use App\Modules\Audit\AuditService;
 use App\Modules\Waitlist\WaitlistService;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,11 @@ class EventService
 
             $data['created_by'] = $userId;
             $data['owner_user_id'] = $data['owner_user_id'] ?? $userId;
+
+            // Inherit the creator's organization unless one was supplied.
+            if (empty($data['organization_id']) && $userId) {
+                $data['organization_id'] = User::whereKey($userId)->value('organization_id');
+            }
 
             // An "upcoming" event whose registration window never opens would be
             // reported as already open by calculateDynamicStatus(). Default the

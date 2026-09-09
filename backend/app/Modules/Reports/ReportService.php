@@ -21,19 +21,26 @@ class ReportService
 {
     public function getGlobalDashboardStats(): array
     {
-        $totalEvents = Event::count();
-        $totalParticipants = Participant::count();
-        $totalRegistrations = Registration::count();
-        $confirmedCount = Registration::where('status', 'confirmed')->count();
-        $waitlistedCount = Registration::where('status', 'waitlisted')->count();
-        $checkedInCount = Registration::where('attendance_status', 'checked_in')->count();
+        // Organization confinement — null for super_admin / unscoped accounts.
+        $orgId = auth()->user()?->scopedOrgId();
+        $eventQ = fn () => Event::query()->when($orgId !== null, fn ($q) => $q->where('organization_id', $orgId));
+        $regQ = fn () => Registration::query()->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)));
 
-        $upcomingEvents = Event::where('start_at', '>', now())->where('status', '!=', 'cancelled')->count();
-        $openEvents = Event::where('status', 'registration_open')->count();
-        $ongoingEvents = Event::where('status', 'ongoing')->count();
-        $completedEvents = Event::where('status', 'completed')->count();
+        $totalEvents = $eventQ()->count();
+        $totalParticipants = $orgId !== null
+            ? Participant::whereHas('registrations.event', fn ($e) => $e->where('organization_id', $orgId))->count()
+            : Participant::count();
+        $totalRegistrations = $regQ()->count();
+        $confirmedCount = $regQ()->where('status', 'confirmed')->count();
+        $waitlistedCount = $regQ()->where('status', 'waitlisted')->count();
+        $checkedInCount = $regQ()->where('attendance_status', 'checked_in')->count();
 
-        $recentEvents = Event::with('category')
+        $upcomingEvents = $eventQ()->where('start_at', '>', now())->where('status', '!=', 'cancelled')->count();
+        $openEvents = $eventQ()->where('status', 'registration_open')->count();
+        $ongoingEvents = $eventQ()->where('status', 'ongoing')->count();
+        $completedEvents = $eventQ()->where('status', 'completed')->count();
+
+        $recentEvents = $eventQ()->with('category')
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get()
@@ -45,7 +52,7 @@ class ReportService
                 return $event;
             });
 
-        $recentRegistrations = Registration::with(['event', 'participant'])
+        $recentRegistrations = $regQ()->with(['event', 'participant'])
             ->orderBy('registered_at', 'desc')
             ->limit(10)
             ->get();

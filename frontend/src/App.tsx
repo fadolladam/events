@@ -20,6 +20,7 @@ import { AuditLogsPage } from './modules/audit/AuditLogsPage';
 import { ParticipantsPage } from './modules/admin/ParticipantsPage';
 import { UsersPage } from './modules/admin/UsersPage';
 import { EventsCalendar } from './modules/admin/EventsCalendar';
+import { OrgSettingsPage } from './modules/admin/OrgSettingsPage';
 
 /* -------- /login -------- */
 const LoginRoute: React.FC = () => {
@@ -69,6 +70,7 @@ export const App: React.FC = () => (
         </Route>
         <Route element={<RequireRole allow={ROLE_TIERS.governance} />}>
           <Route path="users" element={<UsersPage />} />
+          <Route path="settings" element={<OrgSettingsPage />} />
           <Route path="audit" element={<AuditLogsPage />} />
         </Route>
       </Route>

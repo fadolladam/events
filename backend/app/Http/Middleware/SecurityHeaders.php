@@ -65,6 +65,8 @@ class SecurityHeaders
             "default-src 'self'",
             "base-uri 'self'",
             "frame-ancestors 'none'",
+            // Only the OpenStreetMap embed is allowed in an iframe.
+            'frame-src https://www.openstreetmap.org',
             "form-action 'self'",
             "object-src 'none'",
             "script-src 'self'",

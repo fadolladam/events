@@ -190,6 +190,14 @@ export const PublicEventDetail: React.FC<PublicEventDetailProps> = ({
                         <ExternalLink className="w-3 h-3" /> View on map
                       </a>
                     )}
+                    {event.latitude != null && event.longitude != null && (
+                      <iframe
+                        title="Event location map"
+                        loading="lazy"
+                        className="mt-2 h-40 w-full rounded-xl border border-slate-200"
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${event.longitude - 0.01}%2C${event.latitude - 0.008}%2C${event.longitude + 0.01}%2C${event.latitude + 0.008}&layer=mapnik&marker=${event.latitude}%2C${event.longitude}`}
+                      />
+                    )}
                   </div>
                 </div>
 

@@ -133,7 +133,41 @@ class EventController extends Controller
             ? (int) round(min(100, $event->confirmed_count / $capacity * 100))
             : 0;
 
+        $event->readiness = $this->readiness($event);
+
         return response()->json($event);
+    }
+
+    /**
+     * Per-event go-live checklist. Each item is honest — nothing is marked
+     * ready when the underlying config is actually missing.
+     *
+     * @return array{ready_count:int, total:int, items:array<int, array{label:string, ok:bool, hint:string}>}
+     */
+    private function readiness(Event $event): array
+    {
+        $hasCheckinStaff = $event->staff()->where('role', 'checkin_staff')->exists()
+            || $event->staff()->where('role', 'owner')->exists();
+        $formFields = $event->form ? $event->form->fields->where('is_hidden', false)->count() : 0;
+
+        $items = [
+            ['label' => 'Event details', 'ok' => filled($event->title) && filled($event->description), 'hint' => 'Add a title and a description.'],
+            ['label' => 'Schedule', 'ok' => (bool) ($event->start_at && $event->end_at && $event->end_at->gt($event->start_at)), 'hint' => 'Set a start and end time.'],
+            ['label' => 'Registration window', 'ok' => (bool) $event->registration_close_at, 'hint' => 'Set when registration closes.'],
+            ['label' => 'Registration form', 'ok' => $formFields > 0, 'hint' => 'Add at least one form field.'],
+            ['label' => 'Capacity', 'ok' => (int) $event->capacity > 0, 'hint' => 'Set a capacity above zero.'],
+            ['label' => 'Venue / link', 'ok' => filled($event->venue_name) || filled($event->address) || filled($event->meeting_url), 'hint' => 'Add a venue, address, or meeting link.'],
+            ['label' => 'Event team', 'ok' => $event->staff()->exists(), 'hint' => 'Assign at least one team member.'],
+            ['label' => 'Check-in staff', 'ok' => $hasCheckinStaff, 'hint' => 'Assign someone to run the door.'],
+            ['label' => 'Branding', 'ok' => filled($event->cover_image_url), 'hint' => 'Upload a cover image.'],
+            ['label' => 'Published', 'ok' => (bool) $event->published_at, 'hint' => 'Move the event out of draft.'],
+        ];
+
+        return [
+            'ready_count' => count(array_filter($items, fn ($i) => $i['ok'])),
+            'total' => count($items),
+            'items' => $items,
+        ];
     }
 
     public function store(Request $request): JsonResponse

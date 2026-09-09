@@ -233,6 +233,11 @@ export interface EventItem {
   available_seats?: number;
   over_capacity?: boolean;
   utilisation_pct?: number;
+  readiness?: {
+    ready_count: number;
+    total: number;
+    items: Array<{ label: string; ok: boolean; hint: string }>;
+  };
   waitlist_enabled: boolean;
   waitlist_capacity?: number;
   approval_mode: string;
@@ -243,6 +248,8 @@ export interface EventItem {
   address?: string;
   city?: string;
   country?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   map_url?: string;
   organizer_name?: string;
   contact_email?: string;

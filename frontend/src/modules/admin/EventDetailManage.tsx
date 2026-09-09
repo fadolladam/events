@@ -402,6 +402,34 @@ export const EventDetailManage: React.FC = () => {
       {/* OVERVIEW TAB */}
       {currentTab === 'overview' && (
         <div className="space-y-6">
+          {event.readiness && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900">Event Readiness</h3>
+                <span className={`text-xs font-bold ${event.readiness.ready_count === event.readiness.total ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {Math.round((event.readiness.ready_count / event.readiness.total) * 100)}% · {event.readiness.ready_count}/{event.readiness.total}
+                </span>
+              </div>
+              <div className="mb-3 h-1.5 rounded-full bg-slate-100">
+                <div
+                  className={`h-1.5 rounded-full ${event.readiness.ready_count === event.readiness.total ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                  style={{ width: `${(event.readiness.ready_count / event.readiness.total) * 100}%` }}
+                />
+              </div>
+              <ul className="grid gap-1.5 text-xs sm:grid-cols-2">
+                {event.readiness.items.map((it) => (
+                  <li key={it.label} className="flex items-start gap-2">
+                    <span className={it.ok ? 'text-emerald-600' : 'text-slate-300'}>{it.ok ? '✓' : '○'}</span>
+                    <span className={it.ok ? 'text-slate-700' : 'text-slate-500'}>
+                      {it.label}
+                      {!it.ok && <span className="text-slate-400"> — {it.hint}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <EventOverviewTab
             eventId={eventUuid}
             event={event}

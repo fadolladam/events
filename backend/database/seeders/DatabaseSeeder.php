@@ -104,6 +104,7 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Workshops & Training', 'slug' => 'workshop', 'color' => '#059669', 'icon' => 'BookOpen'],
             ['name' => 'Executive Dinner', 'slug' => 'dinner', 'color' => '#b8860b', 'icon' => 'Utensils'],
             ['name' => 'CSR & Community', 'slug' => 'csr', 'color' => '#0067b1', 'icon' => 'Globe'],
+            ['name' => 'Staff Sports & Recreation', 'slug' => 'sports', 'color' => '#f59e0b', 'icon' => 'Trophy'],
         ];
 
         $categoryModels = [];
@@ -111,7 +112,11 @@ class DatabaseSeeder extends Seeder
             $categoryModels[$cat['slug']] = EventCategory::create($cat);
         }
 
-        // 4. Sample Event 1: Blood Donation Drive 2026 (From PRD Scenario)
+        $ticketService = app(TicketService::class);
+
+        // 4. Sample Event 1: Blood Donation Drive 2026 — open for registration,
+        // nobody has signed up yet (mirrors the real intake state: a freshly
+        // published drive with zero registrations so far).
         $bloodEvent = Event::create([
             'organization_id' => $org->id,
             'title' => 'Blood Donation Drive 2026',
@@ -124,7 +129,7 @@ class DatabaseSeeder extends Seeder
             'event_type' => 'physical',
             'visibility' => 'public',
             'status' => 'registration_open',
-            'cover_image_url' => 'https://images.unsplash.com/photo-1615461066841-6116e61058f4?auto=format&fit=crop&w=1200&q=70',
+            'cover_image_url' => '/storage/event-covers/50af3674-7346-45e8-a22f-3559bbee2b7f.png',
             'attachments' => [
                 ['label' => 'Donor Health Screening Form (PDF)', 'url' => 'https://www.rhbgroup.com/'],
                 ['label' => 'RHB Centre Level 3 Floor Plan', 'url' => 'https://www.rhbgroup.com/'],
@@ -166,7 +171,6 @@ class DatabaseSeeder extends Seeder
         EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
         EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
 
-        // Form for Blood Donation
         $bloodForm = RegistrationForm::create([
             'event_id' => $bloodEvent->id,
             'title' => 'Blood Donation Registration Form',
@@ -189,132 +193,265 @@ class DatabaseSeeder extends Seeder
             FormField::create(array_merge($f, ['form_id' => $bloodForm->id]));
         }
 
-        // Seed 70 Confirmed Registrations + 5 Waitlisted Registrations
-        $ticketService = app(TicketService::class);
+        // 5. Sample Event 2: The 31st Angkor Wat International Half Marathon —
+        // real event, first Sunday of December in Siem Reap, Cambodia. Sold
+        // out: capacity 79, 79 confirmed + 3 on the waitlist.
+        $marathonEvent = Event::create([
+            'organization_id' => $org->id,
+            'title' => 'The 31st Angkor Wat International Half Marathon',
+            'short_title' => "Angkor Wat Int'l Half Marathon",
+            'slug' => 'angkor-wat-half-marathon-2026',
+            'event_code' => 'AWHM26',
+            'description' => 'The Angkor Wat International Half Marathon is held on the first Sunday of December in Siem Reap, Cambodia, starting and finishing on the causeway in front of Angkor Wat inside the Angkor Archaeological Park (a UNESCO World Heritage Site). First run in 1996 and organised in aid of landmine survivors and persons with disabilities, the 2026 edition is the 31st. Distances: 3KM fun run, 5KM, 10KM and the 21.1KM half marathon, with wheelchair races.',
+            'short_description' => 'First Sunday of December in Siem Reap – 3KM / 5KM / 10KM / 21KM half marathon.',
+            'category_id' => $categoryModels['csr']->id,
+            'event_type' => 'physical',
+            'visibility' => 'public',
+            'status' => 'registration_open',
+            'cover_image_url' => '/storage/event-covers/97b96d9c-259c-4666-a5a1-bb8915063d9f.png',
+            'organizer_name' => 'RHB Cambodia – CSR & Community',
+            'owner_user_id' => $eventOrganizer->id,
+            'contact_name' => 'RHB Cambodia Marcom',
+            'contact_email' => 'kh.marcom@rhbgroup.com',
+            'contact_phone' => '+60 3-9280 5678',
+            'start_at' => now()->addDays(75)->setTime(6, 0),
+            'end_at' => now()->addDays(75)->setTime(11, 0),
+            'timezone' => 'Asia/Phnom_Penh',
+            'registration_open_at' => now()->subDays(30),
+            'registration_close_at' => now()->addDays(68),
+            'capacity' => 79,
+            'waitlist_enabled' => true,
+            'waitlist_capacity' => 150,
+            'approval_mode' => 'automatic',
+            'allow_cancellation' => true,
+            'cancellation_deadline' => now()->addDays(61),
+            'duplicate_rule' => 'email',
+            'venue_name' => 'Angkor Wat – Angkor Archaeological Park',
+            'address' => 'Angkor Wat causeway, Angkor Archaeological Park',
+            'city' => 'Siem Reap',
+            'province' => 'Siem Reap Province',
+            'country' => 'Cambodia',
+            'postal_code' => '17000',
+            'latitude' => 13.4124693,
+            'longitude' => 103.8669857,
+            'primary_color' => '#0067b1',
+            'secondary_color' => '#5bc2e7',
+            'terms_and_conditions' => 'Participants take part at their own risk and must accept the official event waiver and release of liability. The event is run in aid of landmine survivors and persons with disabilities in Cambodia.',
+            'created_by' => $superAdmin->id,
+            'published_at' => now()->subDays(30),
+        ]);
 
-        for ($i = 1; $i <= 75; $i++) {
-            $isConfirmed = $i <= 70;
+        EventStaff::create(['event_id' => $marathonEvent->id, 'user_id' => $eventOrganizer->id, 'role' => 'owner']);
+        EventStaff::create(['event_id' => $marathonEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
+        EventStaff::create(['event_id' => $marathonEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
+
+        $marathonForm = RegistrationForm::create([
+            'event_id' => $marathonEvent->id,
+            'title' => 'Marathon Registration',
+            'description' => 'Please provide accurate information for registration.',
+            'is_active' => true,
+        ]);
+
+        $marathonFields = [
+            ['field_key' => 'full_name', 'label' => 'Full Name', 'type' => 'text', 'is_required' => true, 'field_order' => 1],
+            ['field_key' => 'email', 'label' => 'Email Address', 'type' => 'email', 'is_required' => true, 'field_order' => 2],
+            ['field_key' => 'phone', 'label' => 'Phone Number', 'type' => 'phone', 'is_required' => true, 'field_order' => 3],
+            ['field_key' => 'emergency_contact_name', 'label' => 'Emergency Contact Name', 'type' => 'text', 'is_required' => false, 'field_order' => 4],
+            ['field_key' => 'emergency_contact_phone', 'label' => 'Emergency Contact Phone', 'type' => 'phone', 'is_required' => false, 'field_order' => 5],
+            ['field_key' => 'race_distance', 'label' => 'Race Distance', 'type' => 'select', 'is_required' => true, 'field_order' => 6, 'options' => ['3KM Fun Run', '5KM', '10KM', '21KM Half Marathon']],
+            ['field_key' => 'tshirt_size', 'label' => 'T-Shirt Size', 'type' => 'select', 'is_required' => true, 'field_order' => 7, 'options' => ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']],
+            ['field_key' => 'medical_conditions', 'label' => 'Medical conditions we should know about', 'type' => 'textarea', 'is_required' => false, 'field_order' => 8],
+            ['field_key' => 'waiver', 'label' => 'I have read and accept the official event waiver and release of liability.', 'type' => 'checkbox', 'is_required' => true, 'field_order' => 9, 'options' => ['I accept']],
+        ];
+
+        foreach ($marathonFields as $f) {
+            FormField::create(array_merge($f, ['form_id' => $marathonForm->id]));
+        }
+
+        // Seed 79 Confirmed Registrations + 3 Waitlisted Registrations
+        $khmerFamilyNames = ['Sok', 'Chan', 'Lim', 'Heng', 'Chea', 'Sar', 'Meas', 'Pich', 'Ros', 'Nou', 'Kim', 'Long', 'Yin', 'Vann', 'Sam'];
+        $khmerGivenNames = ['Dara', 'Sopheak', 'Chhun', 'Srey', 'Vanna', 'Bopha', 'Rithy', 'Sokha', 'Chenda', 'Panha', 'Vibol', 'Sreymom', 'Kosal', 'Ravy', 'Chanthou'];
+        $raceDistances = ['3KM Fun Run', '5KM', '10KM', '21KM Half Marathon'];
+        $tshirtSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+
+        for ($i = 1; $i <= 82; $i++) {
+            $isConfirmed = $i <= 79;
             $seqPad = str_pad((string) $i, 6, '0', STR_PAD_LEFT);
-            $regNum = "EVT-BD26-2026-{$seqPad}";
+            $regNum = "EVT-AWHM26-2026-{$seqPad}";
+            $name = $khmerFamilyNames[$i % count($khmerFamilyNames)].' '.$khmerGivenNames[($i * 7) % count($khmerGivenNames)];
 
             $participant = Participant::create([
-                'name' => "Donor Participant {$i}",
-                'email' => "donor{$i}@example.com",
-                'phone' => '+1 (555) 200-'.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
-                'country' => 'United States',
-                'employee_id' => "EMP-{$i}",
-                'department' => $i % 2 === 0 ? 'Engineering' : 'Marketing',
+                'name' => $name,
+                'email' => "runner{$i}@example.com",
+                'phone' => '+855 '.str_pad((string) (10 + $i % 90), 2, '0', STR_PAD_LEFT).' '.str_pad((string) ($i * 37 % 1000), 3, '0', STR_PAD_LEFT).' '.str_pad((string) ($i * 13 % 1000), 3, '0', STR_PAD_LEFT),
+                'country' => 'Cambodia',
             ]);
 
             $registration = Registration::create([
-                'event_id' => $bloodEvent->id,
+                'event_id' => $marathonEvent->id,
                 'participant_id' => $participant->id,
                 'registration_number' => $regNum,
                 'registration_sequence' => $i,
                 'status' => $isConfirmed ? 'confirmed' : 'waitlisted',
-                'attendance_status' => ($isConfirmed && $i <= 15) ? 'checked_in' : 'not_checked_in',
+                'attendance_status' => 'not_checked_in',
                 'waitlist_priority' => 0,
-                'source' => $i % 3 === 0 ? 'qr_poster' : 'direct',
+                'source' => $i % 4 === 0 ? 'csv_import' : 'direct',
                 'secure_access_token' => Str::random(48),
-                'registered_at' => now()->subHours(80 - $i),
-                'confirmed_at' => $isConfirmed ? now()->subHours(80 - $i) : null,
-                'waitlisted_at' => ! $isConfirmed ? now()->subHours(80 - $i) : null,
-                'checked_in_at' => ($isConfirmed && $i <= 15) ? now()->subMinutes(60 - $i) : null,
+                'registered_at' => now()->subDays(90 - $i),
+                'confirmed_at' => $isConfirmed ? now()->subDays(90 - $i) : null,
+                'waitlisted_at' => ! $isConfirmed ? now()->subDays(90 - $i) : null,
             ]);
 
             RegistrationAnswer::create([
                 'registration_id' => $registration->id,
-                'field_key' => 'blood_type',
-                'field_label' => 'Blood Type',
-                'value_text' => ['O+', 'A+', 'B+', 'AB+'][$i % 4],
+                'field_key' => 'race_distance',
+                'field_label' => 'Race Distance',
+                'value_text' => $raceDistances[$i % 4],
+            ]);
+            RegistrationAnswer::create([
+                'registration_id' => $registration->id,
+                'field_key' => 'tshirt_size',
+                'field_label' => 'T-Shirt Size',
+                'value_text' => $tshirtSizes[$i % count($tshirtSizes)],
             ]);
 
             if ($isConfirmed) {
                 $ticketService->issueTicket($registration);
             } else {
                 WaitlistHistory::create([
-                    'event_id' => $bloodEvent->id,
+                    'event_id' => $marathonEvent->id,
                     'registration_id' => $registration->id,
                     'action' => 'joined_queue',
-                    'new_position' => $i - 70,
-                    'notes' => 'Joined queue at position #'.($i - 70),
-                    'created_at' => now()->subHours(80 - $i),
+                    'new_position' => $i - 79,
+                    'notes' => 'Joined queue at position #'.($i - 79),
+                    'created_at' => now()->subDays(90 - $i),
                 ]);
             }
         }
 
-        // 5. Sample Event 2: Corporate Townhall Q3
-        $townhallEvent = Event::create([
+        // 6. Sample Event 3: RHB Badminton Doubles Tournament 2026 — open for
+        // registration, zero sign-ups yet.
+        $badmintonEvent = Event::create([
             'organization_id' => $org->id,
-            'title' => 'Global Corporate Townhall Q3 2026',
-            'short_title' => 'Townhall Q3',
-            'slug' => 'global-corporate-townhall-q3-2026',
-            'event_code' => 'TH26',
-            'description' => 'Quarterly company-wide all-hands meeting presenting executive strategy, financial performance, and celebrating team achievements.',
-            'short_description' => 'Quarterly company-wide executive strategy and milestones presentation.',
-            'category_id' => $categoryModels['corporate']->id,
-            'event_type' => 'hybrid',
+            'title' => 'RHB Badminton Doubles Tournament 2026',
+            'short_title' => 'Badminton 2026',
+            'slug' => 'rhb-badminton-doubles-tournament-2026',
+            'event_code' => 'RHBB26',
+            'description' => "RHB's staff badminton doubles tournament returns this year.\n\nFormat: doubles only. Every player registers individually and names their partner — both halves of a pair must register for the entry to be confirmed. 20 pairs (40 players) will be accepted; once full, further sign-ups join the waiting list and are promoted automatically if a pair drops out.\n\nBring your own racket. Shuttlecocks, water and light refreshments provided. Wear proper court shoes (non-marking soles).",
+            'short_description' => 'Staff doubles badminton tournament — register as a pair. 20 pairs (40 players), with a waiting list.',
+            'category_id' => $categoryModels['sports']->id,
+            'event_type' => 'physical',
             'visibility' => 'public',
             'status' => 'registration_open',
-            'cover_image_url' => 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1200&q=70',
-            'attachments' => [
-                ['label' => 'Q3 Townhall Agenda', 'url' => 'https://www.rhbgroup.com/'],
-                ['label' => 'Joining Instructions & Zoom Guide', 'url' => 'https://www.rhbgroup.com/'],
-            ],
-            'organizer_name' => 'Executive Office',
-            'owner_user_id' => $superAdmin->id,
-            'contact_name' => 'Corporate Communications',
-            'contact_email' => 'townhall@rhbgroup.com',
-            'start_at' => now()->addDays(20)->setTime(10, 0),
-            'end_at' => now()->addDays(20)->setTime(12, 30),
-            'timezone' => 'Asia/Kuala_Lumpur',
-            'registration_open_at' => now()->subDays(2),
-            'registration_close_at' => now()->addDays(19),
-            'capacity' => 500,
+            'cover_image_url' => 'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?auto=format&fit=crop&w=1200&q=70',
+            'organizer_name' => 'MARCOM & HR',
+            'owner_user_id' => $eventOrganizer->id,
+            'contact_email' => 'sports@rhbgroup.com',
+            'start_at' => now()->addDays(48)->setTime(9, 0),
+            'end_at' => now()->addDays(48)->setTime(13, 0),
+            'timezone' => 'Asia/Phnom_Penh',
+            'registration_open_at' => now()->subDays(3),
+            'registration_close_at' => now()->addDays(40),
+            'capacity' => 40,
             'waitlist_enabled' => true,
-            'waitlist_capacity' => 100,
+            'waitlist_capacity' => 20,
             'approval_mode' => 'automatic',
-            'venue_name' => 'Grand Hall & Zoom Live',
-            'meeting_url' => 'https://zoom.us/j/9988776655',
-            'address' => 'Jalan Tun Razak',
-            'city' => 'Kuala Lumpur',
-            'country' => 'Malaysia',
-            'primary_color' => '#083a5e',
-            'secondary_color' => '#0067b1',
+            'allow_cancellation' => true,
+            'duplicate_rule' => 'email',
+            'venue_name' => 'T Sport — Badminton Courts',
+            'city' => 'Phnom Penh',
+            'country' => 'Cambodia',
+            'map_url' => 'https://www.google.com/maps/search/?api=1&query=T%20Sport%20Badminton%20Phnom%20Penh',
+            'primary_color' => '#0f172a',
+            'secondary_color' => '#2563eb',
             'created_by' => $superAdmin->id,
-            'published_at' => now()->subDays(2),
+            'published_at' => now()->subDays(3),
         ]);
 
-        $townhallForm = RegistrationForm::create(['event_id' => $townhallEvent->id, 'title' => 'Townhall RSVP']);
-        FormField::create(['form_id' => $townhallForm->id, 'field_key' => 'full_name', 'label' => 'Full Name', 'type' => 'text', 'is_required' => true, 'field_order' => 1]);
-        FormField::create(['form_id' => $townhallForm->id, 'field_key' => 'email', 'label' => 'Corporate Email', 'type' => 'email', 'is_required' => true, 'field_order' => 2]);
-        FormField::create(['form_id' => $townhallForm->id, 'field_key' => 'attendance_mode', 'label' => 'Will you attend in-person or virtually?', 'type' => 'radio', 'options' => ['In-Person (Auditorium)', 'Virtual (Zoom)'], 'is_required' => true, 'field_order' => 3]);
+        EventStaff::create(['event_id' => $badmintonEvent->id, 'user_id' => $eventOrganizer->id, 'role' => 'owner']);
+        EventStaff::create(['event_id' => $badmintonEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
+        EventStaff::create(['event_id' => $badmintonEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
 
-        // 6. Sample Event 3: Executive Dinner
-        Event::create([
+        $badmintonForm = RegistrationForm::create([
+            'event_id' => $badmintonEvent->id,
+            'title' => 'Badminton Doubles Registration',
+            'description' => 'Please provide accurate information for registration.',
+            'is_active' => true,
+        ]);
+
+        $badmintonFields = [
+            ['field_key' => 'full_name', 'label' => 'Full Name', 'type' => 'text', 'is_required' => true, 'field_order' => 1],
+            ['field_key' => 'email', 'label' => 'Email Address', 'type' => 'email', 'is_required' => true, 'field_order' => 2],
+            ['field_key' => 'phone', 'label' => 'Phone Number', 'type' => 'phone', 'is_required' => true, 'field_order' => 3],
+            ['field_key' => 'department', 'label' => 'Department', 'type' => 'text', 'is_required' => true, 'field_order' => 4],
+            ['field_key' => 'skill_level', 'label' => 'Skill level', 'type' => 'radio', 'is_required' => true, 'field_order' => 5, 'options' => ['Beginner', 'Intermediate', 'Advanced']],
+            ['field_key' => 'partner', 'label' => 'Preferred doubles partner (optional)', 'type' => 'text', 'is_required' => false, 'field_order' => 6],
+        ];
+
+        foreach ($badmintonFields as $f) {
+            FormField::create(array_merge($f, ['form_id' => $badmintonForm->id]));
+        }
+
+        // 7. Sample Event 4: RHB Staff Football Friendly 2026 — open for
+        // registration, zero sign-ups yet.
+        $footballEvent = Event::create([
             'organization_id' => $org->id,
-            'title' => 'Premier Client Executive Dinner',
-            'short_title' => 'Client Gala Dinner',
-            'slug' => 'premier-client-executive-dinner',
-            'event_code' => 'GD26',
-            'description' => 'Exclusive networking dinner with top tier enterprise clients and leadership.',
-            'category_id' => $categoryModels['dinner']->id,
+            'title' => 'RHB Staff Football Friendly 2026',
+            'short_title' => 'Football Friendly',
+            'slug' => 'rhb-staff-football-friendly-2026',
+            'event_code' => 'RHBF26',
+            'description' => 'Inter-department five-a-side football friendly. All skill levels welcome — this is about staff bonding, not the league table. Boots, shin guards and a water bottle are on you; jerseys and match balls are provided.',
+            'short_description' => 'Inter-department five-a-side football friendly — all skill levels welcome.',
+            'category_id' => $categoryModels['sports']->id,
             'event_type' => 'physical',
-            'visibility' => 'invitation_only',
+            'visibility' => 'public',
             'status' => 'registration_open',
-            'cover_image_url' => 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=1200&q=70',
-            'start_at' => now()->addDays(30)->setTime(18, 30),
-            'end_at' => now()->addDays(30)->setTime(22, 0),
-            'capacity' => 120,
+            'cover_image_url' => 'https://images.unsplash.com/photo-1517927033932-b3d18e61fb3a?auto=format&fit=crop&w=1200&q=70',
+            'organizer_name' => 'MARCOM & HR',
+            'owner_user_id' => $eventAdmin->id,
+            'contact_email' => 'sports@rhbgroup.com',
+            'start_at' => now()->addDays(35)->setTime(17, 0),
+            'end_at' => now()->addDays(35)->setTime(20, 0),
+            'timezone' => 'Asia/Kuala_Lumpur',
+            'registration_open_at' => now()->subDays(1),
+            'registration_close_at' => now()->addDays(30),
+            'capacity' => 60,
             'waitlist_enabled' => true,
-            'approval_mode' => 'manual',
-            'venue_name' => 'The St. Regis Kuala Lumpur - Grand Ballroom',
+            'waitlist_capacity' => 20,
+            'approval_mode' => 'automatic',
+            'allow_cancellation' => true,
+            'duplicate_rule' => 'email',
+            'venue_name' => 'RHB Sports Complex',
             'city' => 'Kuala Lumpur',
             'country' => 'Malaysia',
-            'primary_color' => '#083a5e',
-            'secondary_color' => '#b8860b',
+            'primary_color' => '#0f172a',
+            'secondary_color' => '#2563eb',
             'created_by' => $superAdmin->id,
             'published_at' => now()->subDays(1),
         ]);
+
+        EventStaff::create(['event_id' => $footballEvent->id, 'user_id' => $eventAdmin->id, 'role' => 'owner']);
+        EventStaff::create(['event_id' => $footballEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
+        EventStaff::create(['event_id' => $footballEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
+
+        $footballForm = RegistrationForm::create([
+            'event_id' => $footballEvent->id,
+            'title' => 'Football Friendly Registration',
+            'description' => 'Please provide accurate information for registration.',
+            'is_active' => true,
+        ]);
+
+        $footballFields = [
+            ['field_key' => 'full_name', 'label' => 'Full Name', 'type' => 'text', 'is_required' => true, 'field_order' => 1],
+            ['field_key' => 'email', 'label' => 'Email Address', 'type' => 'email', 'is_required' => true, 'field_order' => 2],
+            ['field_key' => 'phone', 'label' => 'Phone Number', 'type' => 'phone', 'is_required' => true, 'field_order' => 3],
+            ['field_key' => 'department', 'label' => 'Department', 'type' => 'text', 'is_required' => true, 'field_order' => 4],
+            ['field_key' => 'position', 'label' => 'Preferred position', 'type' => 'select', 'is_required' => false, 'field_order' => 5, 'options' => ['Goalkeeper', 'Defender', 'Midfielder', 'Forward', 'Any']],
+            ['field_key' => 'jersey', 'label' => 'Jersey size', 'type' => 'select', 'is_required' => true, 'field_order' => 6, 'options' => ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']],
+        ];
+
+        foreach ($footballFields as $f) {
+            FormField::create(array_merge($f, ['form_id' => $footballForm->id]));
+        }
     }
 }

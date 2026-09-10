@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast, confirmDialog } from '../../components/uiFeedback';
 import { apiClient, EventItem, getStoredUser, ROLE_TIERS, hasRole } from '../../services/api';
-import { Plus, Search, QrCode, Clock, Copy, Trash2 } from 'lucide-react';
+import { Plus, Search, QrCode, Clock, Copy, Trash2, CalendarDays, X } from 'lucide-react';
 import { eventCover, onCoverError } from '../../lib/eventMedia';
 import { paths } from '../../routes/paths';
 import { useAdminUI } from '../../components/AdminLayout';
+import { EventsCalendar } from './EventsCalendar';
 
 export const EventsManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export const EventsManagement: React.FC = () => {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const role = getStoredUser()?.role;
   const canManage = hasRole(role, ROLE_TIERS.eventManager);
@@ -125,6 +127,18 @@ export const EventsManagement: React.FC = () => {
           <option value="completed">Completed</option>
           <option value="archived">Archived</option>
         </select>
+      </div>
+
+      {/* View toggle — calendar popup, so staff can see at a glance what
+          date each event falls on without leaving this list. */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowCalendar(true)}
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-xs hover:bg-slate-50"
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+          View as Calendar
+        </button>
       </div>
 
       {/* Events Table */}
@@ -236,6 +250,31 @@ export const EventsManagement: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {showCalendar && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs"
+          onClick={() => setShowCalendar(false)}
+        >
+          {/* Close button lives on the backdrop, not inside the scrollable
+              card — an overflow-y-auto ancestor clips any child positioned
+              outside its own box, which swallowed this button when it sat
+              on the card itself. */}
+          <button
+            onClick={() => setShowCalendar(false)}
+            className="absolute right-6 top-6 z-10 rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 shadow-md hover:bg-slate-50 hover:text-slate-700"
+            title="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div
+            className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <EventsCalendar />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

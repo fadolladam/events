@@ -286,7 +286,7 @@ class DatabaseSeeder extends Seeder
 
         // Seed 79 Confirmed Registrations + 3 Waitlisted Registrations
         $khmerFamilyNames = ['Sok', 'Chan', 'Lim', 'Heng', 'Chea', 'Sar', 'Meas', 'Pich', 'Ros', 'Nou', 'Kim', 'Long', 'Yin', 'Vann', 'Sam'];
-        $khmerGivenNames = ['Dara', 'Sopheak', 'Chhun', 'Srey', 'Vanna', 'Bopha', 'Rithy', 'Sokha', 'Chenda', 'Panha', 'Vibol', 'Sreymom', 'Kosal', 'Ravy', 'Chanthou'];
+        $khmerGivenNames = ['Dara', 'Sopheak', 'Chhun', 'Srey', 'Vanna', 'Bopha', 'Rithy', 'Sokha', 'Chenda', 'Panha', 'Vibol', 'Sreymom', 'Kosal', 'Ravy', 'Chanthou', 'Malis', 'Nary'];
         $raceDistances = ['3KM Fun Run', '5KM', '10KM', '21KM Half Marathon'];
         $tshirtSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
@@ -294,12 +294,17 @@ class DatabaseSeeder extends Seeder
             $isConfirmed = $i <= 79;
             $seqPad = str_pad((string) $i, 6, '0', STR_PAD_LEFT);
             $regNum = "EVT-AWHM26-2026-{$seqPad}";
-            // Base-(family count) digit pair so every i in range gets a
-            // distinct (family, given) combination instead of the two
-            // indices both cycling on period count($khmerFamilyNames) and
-            // repeating the same name every 15 registrations.
+            // 15 family names and 17 given names — coprime list lengths, so
+            // both indices advance every single registrant instead of one
+            // holding still while the other cycles. (An earlier version used
+            // a base-15 digit pair here: same modulus size on both axes made
+            // every block of 15 consecutive registrants share one given name
+            // — e.g. #1-15 were all "... Dara" — which read as broken data
+            // even though the full names were technically all distinct.)
+            // With coprime lengths 15 and 17, the pair only repeats every
+            // 255 registrants, comfortably above the 82 seeded here.
             $familyIdx = ($i - 1) % count($khmerFamilyNames);
-            $givenIdx = intdiv($i - 1, count($khmerFamilyNames)) % count($khmerGivenNames);
+            $givenIdx = ($i - 1) % count($khmerGivenNames);
             $name = $khmerFamilyNames[$familyIdx].' '.$khmerGivenNames[$givenIdx];
 
             $participant = Participant::create([

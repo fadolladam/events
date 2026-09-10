@@ -96,21 +96,21 @@ class DashboardService
         return [
             'filters' => ['range' => $range, 'from' => $from?->toIso8601String(), 'to' => $to?->toIso8601String()],
             'generated_at' => now()->toIso8601String(),
-            'kpis' => $this->kpis($rows, $from, $to),
+            'kpis' => $this->kpis($rows, $from, $to, $orgId),
             'event_status_breakdown' => $this->statusBreakdown($rows),
             'action_required' => $this->actionRequired($rows, $formFieldCounts, $checkinStaffEventIds),
             'active_events' => $this->activeEvents($rows),
             'capacity_utilization' => $this->capacityUtilization($rows),
-            'waitlist' => $this->waitlist($rows),
+            'waitlist' => $this->waitlist($rows, $orgId),
             'pending_approvals' => $this->pendingApprovals($rows),
             'upcoming_events' => $this->upcomingEvents($rows),
             'today_operations' => $this->todayOperations($rows),
             'attendance_performance' => $this->attendancePerformance($rows),
-            'registration_trend' => $this->registrationTrend($from, $to),
-            'registration_status_breakdown' => $this->registrationStatusBreakdown(),
-            'recent_registrations' => $this->recentRegistrations(),
-            'recent_activity' => $this->recentActivity(),
-            'notification_health' => $this->notificationHealth(),
+            'registration_trend' => $this->registrationTrend($from, $to, $orgId),
+            'registration_status_breakdown' => $this->registrationStatusBreakdown($orgId),
+            'recent_registrations' => $this->recentRegistrations($orgId),
+            'recent_activity' => $this->recentActivity($orgId),
+            'notification_health' => $this->notificationHealth($orgId),
             'readiness' => $this->readiness($rows, $formFieldCounts, $checkinStaffEventIds, $notificationTemplateTriggers, $hasGlobalTemplate),
         ];
     }
@@ -119,12 +119,13 @@ class DashboardService
     // Sections
     // =====================================================================
 
-    private function kpis(Collection $rows, ?Carbon $from, ?Carbon $to): array
+    private function kpis(Collection $rows, ?Carbon $from, ?Carbon $to, ?int $orgId): array
     {
         $confirmed = $rows->sum('confirmed');
         $present = $rows->sum('present');
 
-        $trendQuery = Registration::query();
+        $trendQuery = Registration::query()
+            ->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)));
         if ($from) {
             $trendQuery->where('registered_at', '>=', $from);
         }
@@ -308,7 +309,7 @@ class DashboardService
         return 'HEALTHY';
     }
 
-    private function waitlist(Collection $rows): array
+    private function waitlist(Collection $rows, ?int $orgId): array
     {
         $withQueue = $rows->filter(fn ($r) => $r->waitlisted > 0)->sortByDesc('waitlisted')->values();
 
@@ -321,6 +322,7 @@ class DashboardService
 
         $recentPromotions = WaitlistHistory::query()
             ->where('action', 'promoted')
+            ->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)))
             ->with(['event:id,title,event_code', 'registration.participant:id,name'])
             ->orderByDesc('created_at')
             ->limit(10)
@@ -462,13 +464,14 @@ class DashboardService
             ->all();
     }
 
-    private function registrationTrend(?Carbon $from, ?Carbon $to): array
+    private function registrationTrend(?Carbon $from, ?Carbon $to, ?int $orgId): array
     {
         $from = ($from ?? now()->subDays(30))->copy()->startOfDay();
         $to = ($to ?? now())->copy()->endOfDay();
 
         $grouped = Registration::query()
             ->whereBetween('registered_at', [$from, $to])
+            ->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)))
             ->selectRaw('DATE(registered_at) d, status, count(*) c')
             ->groupBy('d', 'status')
             ->get();
@@ -491,9 +494,10 @@ class DashboardService
         return $series;
     }
 
-    private function registrationStatusBreakdown(): array
+    private function registrationStatusBreakdown(?int $orgId): array
     {
         $counts = Registration::query()
+            ->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)))
             ->selectRaw('status, count(*) c')
             ->groupBy('status')
             ->pluck('c', 'status');
@@ -507,9 +511,10 @@ class DashboardService
         ];
     }
 
-    private function recentRegistrations(): array
+    private function recentRegistrations(?int $orgId): array
     {
         return Registration::query()
+            ->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)))
             ->with(['participant:id,name', 'event:id,title,event_code,slug'])
             ->orderByDesc('registered_at')
             ->limit(12)
@@ -528,9 +533,10 @@ class DashboardService
             ->all();
     }
 
-    private function recentActivity(): array
+    private function recentActivity(?int $orgId): array
     {
         return AuditLog::query()
+            ->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)))
             ->with('event:id,title')
             ->orderByDesc('created_at')
             ->limit(15)
@@ -545,20 +551,22 @@ class DashboardService
             ->all();
     }
 
-    private function notificationHealth(): array
+    private function notificationHealth(?int $orgId): array
     {
         $startOfDay = now()->startOfDay();
+        $scoped = fn () => NotificationLog::query()
+            ->when($orgId !== null, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('organization_id', $orgId)));
 
-        $counts = NotificationLog::query()
+        $counts = $scoped()
             ->selectRaw('status, count(*) c')
             ->groupBy('status')
             ->pluck('c', 'status');
 
         return [
-            'sent_today' => NotificationLog::query()->where('status', 'sent')->where('created_at', '>=', $startOfDay)->count(),
+            'sent_today' => $scoped()->where('status', 'sent')->where('created_at', '>=', $startOfDay)->count(),
             'pending' => (int) ($counts['queued'] ?? 0),
             'failed' => (int) ($counts['failed'] ?? 0),
-            'failed_24h' => NotificationLog::query()->where('status', 'failed')->where('created_at', '>=', now()->subDay())->count(),
+            'failed_24h' => $scoped()->where('status', 'failed')->where('created_at', '>=', now()->subDay())->count(),
         ];
     }
 

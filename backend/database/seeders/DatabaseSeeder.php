@@ -96,6 +96,20 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
+        // Lowest tier in the RBAC hierarchy (RBAC-MATRIX.md) — read-only
+        // console access, no write endpoint anywhere allows this role. Fully
+        // wired everywhere else (RoleMiddleware, EventStaffController::ROLES,
+        // the Users/Team-tab role dropdowns), it just never had a demo login.
+        $viewer = User::create([
+            'name' => 'Dara Sok (Viewer)',
+            'email' => 'viewer@rhbgroup.com',
+            'password' => Hash::make('password123'),
+            'role' => 'viewer',
+            'organization_id' => $org->id,
+            'phone' => '+60 12-100 0006',
+            'status' => 'active',
+        ]);
+
         // 3. Event Categories
         $categories = [
             ['name' => 'Blood Donation', 'slug' => 'blood-donation', 'color' => '#ef3e42', 'icon' => 'Heart'],
@@ -170,6 +184,7 @@ class DatabaseSeeder extends Seeder
         EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $eventOrganizer->id, 'role' => 'organizer']);
         EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
         EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
+        EventStaff::create(['event_id' => $bloodEvent->id, 'user_id' => $viewer->id, 'role' => 'viewer']);
 
         $bloodForm = RegistrationForm::create([
             'event_id' => $bloodEvent->id,
@@ -244,6 +259,7 @@ class DatabaseSeeder extends Seeder
         EventStaff::create(['event_id' => $marathonEvent->id, 'user_id' => $eventOrganizer->id, 'role' => 'owner']);
         EventStaff::create(['event_id' => $marathonEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
         EventStaff::create(['event_id' => $marathonEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
+        EventStaff::create(['event_id' => $marathonEvent->id, 'user_id' => $viewer->id, 'role' => 'viewer']);
 
         $marathonForm = RegistrationForm::create([
             'event_id' => $marathonEvent->id,
@@ -377,6 +393,7 @@ class DatabaseSeeder extends Seeder
         EventStaff::create(['event_id' => $badmintonEvent->id, 'user_id' => $eventOrganizer->id, 'role' => 'owner']);
         EventStaff::create(['event_id' => $badmintonEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
         EventStaff::create(['event_id' => $badmintonEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
+        EventStaff::create(['event_id' => $badmintonEvent->id, 'user_id' => $viewer->id, 'role' => 'viewer']);
 
         $badmintonForm = RegistrationForm::create([
             'event_id' => $badmintonEvent->id,
@@ -439,6 +456,7 @@ class DatabaseSeeder extends Seeder
         EventStaff::create(['event_id' => $footballEvent->id, 'user_id' => $eventAdmin->id, 'role' => 'owner']);
         EventStaff::create(['event_id' => $footballEvent->id, 'user_id' => $registrationOfficer->id, 'role' => 'registration_officer']);
         EventStaff::create(['event_id' => $footballEvent->id, 'user_id' => $checkinStaff->id, 'role' => 'checkin_staff']);
+        EventStaff::create(['event_id' => $footballEvent->id, 'user_id' => $viewer->id, 'role' => 'viewer']);
 
         $footballForm = RegistrationForm::create([
             'event_id' => $footballEvent->id,

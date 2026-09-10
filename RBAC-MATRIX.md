@@ -3,7 +3,7 @@
 _Authoritative source: `backend/routes/api.php` + `App\Modules\Auth\RoleMiddleware`
 + `App\Modules\Auth\EventScopeMiddleware`. The React UI mirrors this in
 `frontend/src/services/api.ts` (`ROLE_TIERS`) for convenience only — the backend
-is authoritative. Last reviewed 2026-09-09._
+is authoritative. Last reviewed 2026-09-10._
 
 ## Two-layer model
 
@@ -79,14 +79,40 @@ Legend: ✔ = allowed (subject to event scope where the path has an event/regist
 
 ## Tests
 
-`EventScopeAuthorizationTest` (org-wide vs assigned vs unassigned vs 401),
-`ManualRegistrationTest` (registration-officer tier + event scope),
-`AuditTrailTest`, `TicketSecurityTest`, `LoginThrottleTest`, `UploadSecurityTest`.
-Broader endpoint×role coverage (E§49) is TODO-MASTER #11 follow-up.
+`RbacMatrixTest` (every protected endpoint × all 6 roles + unauthenticated —
+the exhaustive matrix; #11), `EventScopeAuthorizationTest` (org-wide vs
+assigned vs unassigned vs 401), `ManualRegistrationTest` (registration-officer
+tier + event scope), `AuditTrailTest`, `TicketSecurityTest`,
+`LoginThrottleTest`, `UploadSecurityTest`, `LeastPrivilegeApiResourcesTest`
+(field-level widening by role on the check-in/attendance endpoints — #12),
+`DashboardOverviewScopeTest` (cross-organization isolation on
+`/dashboard/overview`).
 
-## Known residual gaps (TODO-MASTER)
+## Known residual gaps
 
-- #11: exhaustive endpoint × 7-role automated matrix not yet complete.
-- #12: responses still return raw models (PII exposure) — API Resources pending.
-- #34: no UI yet to manage `event_staff`, so scoped roles depend on seeded/DB
-  assignments.
+- #12 (API Resources): only `checkin/*` and `attendance` responses are
+  wrapped in least-privilege resources — the fields those two endpoints
+  needed hidden from `checkin_staff` (phone/country/organization).
+  `RegistrationController`/`ParticipantController`/`WaitlistController`
+  (registration_officer+ only — no privilege differential there) and
+  `SearchController` (already shows email/employee_id to `viewer` via an
+  existing UI, same reasoning) still return raw models; revisit only if a
+  broader role gets routed to either.
+- Reviewed 2026-09-10: `DashboardService::getOverview()` had six aggregates
+  (`kpis.total_registrations`, `registration_trend`,
+  `registration_status_breakdown`, `recent_registrations`,
+  `recent_activity`, `notification_health`, `waitlist.recent_promotions`)
+  that skipped `User::scopedOrgId()` entirely — every other query in the app
+  applies it, these simply didn't, so any staff role (down to `viewer`) saw
+  registration/audit/notification data from every organization, not just
+  their own. Fixed; the per-event lists on the same response
+  (`active_events`, `capacity_utilization`, etc.) are still deliberately
+  org-wide rather than limited to the caller's assigned events — that part
+  is intentional (see the `GET /dashboard/*` row above) and unchanged.
+  `DashboardOverviewScopeTest` covers the regression.
+- `viewer` is fully wired (`RoleMiddleware`, `EventScopeMiddleware`,
+  `EventStaffController::ROLES`, both the Users and Team-tab role
+  dropdowns) but had no seeded demo account anywhere, so nobody could log
+  in and see the read-only experience without creating one by hand. Added
+  `viewer@rhbgroup.com` to `DatabaseSeeder`/`FreshProjectSeeder`, on the
+  team for every seeded event.

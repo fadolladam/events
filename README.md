@@ -125,8 +125,9 @@ npm run build    # when done — rebuilds into backend/public/
 
 ## Logins
 
-Both `install/events.sql` and `php artisan migrate --seed` create the same five
-accounts (all `@rhbgroup.com`, password **`password123`**):
+`php artisan migrate --seed` creates all six staff roles (all `@rhbgroup.com`,
+password **`password123`**), each already on the event team for every seeded
+demo event:
 
 | Role | Email |
 |---|---|
@@ -135,11 +136,13 @@ accounts (all `@rhbgroup.com`, password **`password123`**):
 | Event Organizer | `organizer@rhbgroup.com` |
 | Registration Officer | `registration@rhbgroup.com` |
 | Check-In Staff | `staff@rhbgroup.com` |
+| Viewer | `viewer@rhbgroup.com` |
 
-`install/events.sql` also carries the three demo events (Badminton, Blood
-Donation, Angkor Wat marathon) with their registrations; `migrate --seed`
-generates its own generic demo data instead. Change the passwords before any
-non-local deployment.
+`install/events.sql` is an older static snapshot (5 accounts, no `viewer` row
+yet) that carries three demo events (Badminton, Blood Donation, Angkor Wat
+marathon) with their registrations; `migrate --seed` generates its own demo
+data instead — see `DatabaseSeeder.php` for the current set. Change the
+passwords before any non-local deployment.
 
 ---
 

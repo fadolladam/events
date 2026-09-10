@@ -51,6 +51,7 @@ class FreshProjectSeeder extends Seeder
             ['Aidan Lim', 'organizer@rhbgroup.com', 'event_organizer'],
             ['Priya Nair', 'registration@rhbgroup.com', 'registration_officer'],
             ['Marcus Vance', 'staff@rhbgroup.com', 'checkin_staff'],
+            ['Dara Sok', 'viewer@rhbgroup.com', 'viewer'],
         ])->mapWithKeys(function ($u, $i) use ($org) {
             return [$u[2] => User::create([
                 'name' => $u[0],
@@ -120,6 +121,7 @@ class FreshProjectSeeder extends Seeder
         ]);
         EventStaff::create(['event_id' => $blood->id, 'user_id' => $users['event_admin']->id, 'role' => 'owner']);
         EventStaff::create(['event_id' => $blood->id, 'user_id' => $users['checkin_staff']->id, 'role' => 'checkin_staff']);
+        EventStaff::create(['event_id' => $blood->id, 'user_id' => $users['viewer']->id, 'role' => 'viewer']);
         EventStaff::create(['event_id' => $blood->id, 'user_id' => $users['registration_officer']->id, 'role' => 'registration_officer']);
         $this->form($blood, 'Blood Donation Registration', [
             ['full_name', 'Full Name', 'text', true],
@@ -186,6 +188,7 @@ class FreshProjectSeeder extends Seeder
         ]);
         EventStaff::create(['event_id' => $marathon->id, 'user_id' => $users['event_organizer']->id, 'role' => 'owner']);
         EventStaff::create(['event_id' => $marathon->id, 'user_id' => $users['checkin_staff']->id, 'role' => 'checkin_staff']);
+        EventStaff::create(['event_id' => $marathon->id, 'user_id' => $users['viewer']->id, 'role' => 'viewer']);
         $this->form($marathon, 'Marathon Registration', [
             ['full_name', 'Full Name', 'text', true],
             ['email', 'Email Address', 'email', true],

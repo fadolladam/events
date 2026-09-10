@@ -67,6 +67,31 @@ class ParticipantDirectoryTest extends TestCase
         $this->assertCount(1, $this->getJson('/api/participants?search=nadia@rhb')->json('data'));
     }
 
+    public function test_filters_by_department(): void
+    {
+        $this->officer();
+        $this->seedPeople();
+
+        $rows = $this->getJson('/api/participants?department=Treasury')->json('data');
+        $this->assertCount(1, $rows);
+        $this->assertSame('nadia@rhb.com', $rows[0]['email']);
+    }
+
+    public function test_filters_by_event_id_to_only_participants_registered_for_that_event(): void
+    {
+        $this->officer();
+        $this->seedPeople();
+
+        $eventB = Event::where('event_code', 'BBB')->firstOrFail();
+
+        // Nadia registered for both AAA and BBB; Omar only for AAA — filtering
+        // by BBB's id must return Nadia alone even though the directory is
+        // deduped across all her registrations.
+        $rows = $this->getJson("/api/participants?event_id={$eventB->id}")->json('data');
+        $this->assertCount(1, $rows);
+        $this->assertSame('nadia@rhb.com', $rows[0]['email']);
+    }
+
     public function test_lookup_is_a_lean_typeahead_needing_two_chars(): void
     {
         $this->officer();

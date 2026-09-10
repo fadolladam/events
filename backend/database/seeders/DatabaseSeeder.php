@@ -37,11 +37,11 @@ class DatabaseSeeder extends Seeder
 
         // 1. Organization
         $org = Organization::create([
-            'name' => 'RHB Bank Berhad',
+            'name' => 'RHB Bank Cambodia',
             'slug' => 'rhb-bank',
-            'timezone' => 'Asia/Kuala_Lumpur',
-            'country' => 'Malaysia',
-            'contact_email' => 'events@rhbgroup.com',
+            'timezone' => 'Asia/Phnom_Penh',
+            'country' => 'Cambodia',
+            'contact_email' => 'kh.marcom@rhbgroup.com',
             'contact_phone' => '+60 3-9280 8888',
         ]);
 

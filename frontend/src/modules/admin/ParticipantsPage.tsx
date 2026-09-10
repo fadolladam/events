@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { apiClient } from '../../services/api';
+import { apiClient, EventItem } from '../../services/api';
 import { Search, X, RefreshCw, Mail, Phone, IdCard, Building2 } from 'lucide-react';
 
 interface Participant {
@@ -30,6 +30,9 @@ const fmtDate = (iso?: string) =>
 export const ParticipantsPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [eventFilter, setEventFilter] = useState('');
+  const [department, setDepartment] = useState('');
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [rows, setRows] = useState<Participant[]>([]);
   const [meta, setMeta] = useState({ total: 0, last_page: 1 });
   const [page, setPage] = useState(1);
@@ -44,13 +47,31 @@ export const ParticipantsPage: React.FC = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [debounced]);
+  }, [debounced, eventFilter, department]);
+
+  // Events for the filter dropdown — the same org/role-scoped list the rest
+  // of the admin already uses, just fetched once at a size large enough to
+  // cover a demo/small-org event list.
+  useEffect(() => {
+    apiClient
+      .get('/events', { params: { per_page: 200 } })
+      .then((res) => setEvents(res.data.data || []))
+      .catch(() => setEvents([]));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     apiClient
-      .get('/participants', { params: { page, per_page: 25, ...(debounced ? { search: debounced } : {}) } })
+      .get('/participants', {
+        params: {
+          page,
+          per_page: 25,
+          ...(debounced ? { search: debounced } : {}),
+          ...(eventFilter ? { event_id: eventFilter } : {}),
+          ...(department ? { department } : {}),
+        },
+      })
       .then((res) => {
         if (cancelled) return;
         setRows(res.data.data || []);
@@ -60,7 +81,7 @@ export const ParticipantsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [page, debounced]);
+  }, [page, debounced, eventFilter, department]);
 
   const openDetail = async (id: string) => {
     setDetailLoading(true);
@@ -92,7 +113,7 @@ export const ParticipantsPage: React.FC = () => {
         <p className="text-xs text-slate-400">Everyone who has ever registered — one row per person, across all events.</p>
       </div>
 
-      <div className="relative mb-4 max-w-md">
+      <div className="relative mb-3 max-w-md">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           value={search}
@@ -100,6 +121,33 @@ export const ParticipantsPage: React.FC = () => {
           placeholder="Name, email, phone, employee ID, department…"
           className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+        <select
+          value={eventFilter}
+          onChange={(e) => setEventFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5"
+        >
+          <option value="">All events</option>
+          {events.map((ev) => (
+            <option key={ev.id} value={ev.id}>{ev.short_title || ev.title}</option>
+          ))}
+        </select>
+        <input
+          value={department}
+          onChange={(e) => setDepartment(e.target.value)}
+          placeholder="Department"
+          className="w-36 rounded-lg border border-slate-200 px-2.5 py-1.5"
+        />
+        {(eventFilter || department) && (
+          <button
+            onClick={() => { setEventFilter(''); setDepartment(''); }}
+            className="text-slate-400 underline hover:text-slate-700"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">

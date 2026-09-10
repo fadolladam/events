@@ -41,6 +41,11 @@ class ParticipantController extends Controller
             $query->where('department', 'like', '%'.$request->input('department').'%');
         }
 
+        if ($request->filled('event_id')) {
+            $eventId = $request->input('event_id');
+            $query->whereHas('registrations', fn ($q) => $q->where('event_id', $eventId));
+        }
+
         $perPage = min(200, max(1, (int) $request->input('per_page', 25)));
 
         return response()->json(

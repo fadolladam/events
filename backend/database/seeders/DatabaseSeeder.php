@@ -278,7 +278,13 @@ class DatabaseSeeder extends Seeder
             $isConfirmed = $i <= 79;
             $seqPad = str_pad((string) $i, 6, '0', STR_PAD_LEFT);
             $regNum = "EVT-AWHM26-2026-{$seqPad}";
-            $name = $khmerFamilyNames[$i % count($khmerFamilyNames)].' '.$khmerGivenNames[($i * 7) % count($khmerGivenNames)];
+            // Base-(family count) digit pair so every i in range gets a
+            // distinct (family, given) combination instead of the two
+            // indices both cycling on period count($khmerFamilyNames) and
+            // repeating the same name every 15 registrations.
+            $familyIdx = ($i - 1) % count($khmerFamilyNames);
+            $givenIdx = intdiv($i - 1, count($khmerFamilyNames)) % count($khmerGivenNames);
+            $name = $khmerFamilyNames[$familyIdx].' '.$khmerGivenNames[$givenIdx];
 
             $participant = Participant::create([
                 'name' => $name,

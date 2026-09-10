@@ -26,8 +26,17 @@ class CheckInController extends Controller
 
         $result = $this->checkInService->scanQr($eventId, $validated['qr_data']);
 
+        // The ticket carries its own eager-loaded registration.participant
+        // (same rows RegistrationResource already serializes below, least-
+        // privilege). Drop that copy so it isn't re-exposed raw underneath
+        // 'ticket' in the response.
+        $ticket = $result['ticket'];
+        if ($ticket->relationLoaded('registration')) {
+            $ticket->unsetRelation('registration');
+        }
+
         return response()->json([
-            'ticket' => $result['ticket'],
+            'ticket' => $ticket,
             'registration' => new RegistrationResource($result['registration']),
             'participant' => new ParticipantResource($result['participant']),
             'already_checked_in' => $result['already_checked_in'],

@@ -131,4 +131,22 @@ class LeastPrivilegeApiResourcesTest extends TestCase
 
         $res->assertJsonMissingPath('registration.answers');
     }
+
+    /**
+     * scanQr eager-loads the ticket's registration.participant from the
+     * *ticket* side (Ticket::with(['registration.participant', ...])), a
+     * second, independent copy of the same rows the top-level 'registration'
+     * key already serializes through RegistrationResource. Guards against
+     * that raw copy re-exposing contact fields underneath 'ticket'.
+     */
+    public function test_checkin_staff_scan_does_not_leak_contact_fields_via_the_nested_ticket_registration(): void
+    {
+        $this->actingAsStaff('checkin_staff');
+
+        $res = $this->postJson("/api/events/{$this->event->id}/checkin/scan", [
+            'qr_data' => $this->ticket['secure_token'],
+        ])->assertOk();
+
+        $res->assertJsonMissingPath('ticket.registration');
+    }
 }

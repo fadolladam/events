@@ -3,6 +3,8 @@
 namespace App\Modules\CheckIn;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ParticipantResource;
+use App\Http\Resources\RegistrationResource;
 use App\Models\Checkin;
 use App\Models\Event;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +26,13 @@ class CheckInController extends Controller
 
         $result = $this->checkInService->scanQr($eventId, $validated['qr_data']);
 
-        return response()->json($result);
+        return response()->json([
+            'ticket' => $result['ticket'],
+            'registration' => new RegistrationResource($result['registration']),
+            'participant' => new ParticipantResource($result['participant']),
+            'already_checked_in' => $result['already_checked_in'],
+            'last_checkin' => $result['last_checkin'],
+        ]);
     }
 
     public function process(Request $request, string $eventId): JsonResponse
@@ -70,7 +78,7 @@ class CheckInController extends Controller
 
         return response()->json([
             'message' => 'Check-in undone successfully.',
-            'registration' => $registration,
+            'registration' => new RegistrationResource($registration),
         ]);
     }
 
@@ -85,7 +93,7 @@ class CheckInController extends Controller
 
         $results = $this->checkInService->searchForCheckIn($eventId, $keyword);
 
-        return response()->json($results);
+        return response()->json(RegistrationResource::collection($results));
     }
 
     public function recentCheckins(string $eventId): JsonResponse
@@ -94,7 +102,20 @@ class CheckInController extends Controller
             ->with(['registration.participant', 'checkedInBy'])
             ->orderBy('checked_in_at', 'desc')
             ->limit(30)
-            ->get();
+            ->get()
+            ->map(fn (Checkin $checkin) => [
+                'id' => $checkin->id,
+                'registration_id' => $checkin->registration_id,
+                'event_id' => $checkin->event_id,
+                'checkin_type' => $checkin->checkin_type,
+                'gate' => $checkin->gate,
+                'notes' => $checkin->notes,
+                'checked_in_at' => $checkin->checked_in_at,
+                'checked_in_by' => $checkin->checkedInBy,
+                'registration' => $checkin->relationLoaded('registration')
+                    ? new RegistrationResource($checkin->registration)
+                    : null,
+            ]);
 
         return response()->json($checkins);
     }

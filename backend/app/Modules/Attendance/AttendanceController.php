@@ -3,6 +3,7 @@
 namespace App\Modules\Attendance;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RegistrationResource;
 use App\Models\Attendance;
 use App\Models\Event;
 use App\Models\Registration;
@@ -26,6 +27,8 @@ class AttendanceController extends Controller
 
         $perPage = (int) $request->input('per_page', 25);
         $records = $query->orderBy('registered_at', 'asc')->paginate($perPage);
+
+        $records->getCollection()->transform(fn (Registration $reg) => new RegistrationResource($reg));
 
         return response()->json($records);
     }
@@ -69,7 +72,7 @@ class AttendanceController extends Controller
 
         return response()->json([
             'message' => 'Attendance status updated successfully.',
-            'registration' => $registration->fresh(['participant', 'attendance']),
+            'registration' => new RegistrationResource($registration->fresh(['participant', 'attendance'])),
         ]);
     }
 

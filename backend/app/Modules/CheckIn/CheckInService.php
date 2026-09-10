@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\Registration;
 use App\Models\Ticket;
 use App\Modules\Audit\AuditService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -169,9 +170,13 @@ class CheckInService
     }
 
     /**
-     * Search participants in event for manual check-in
+     * Search participants in event for manual check-in. Returns Eloquent
+     * models (not arrays) so the controller can serialize them through
+     * RegistrationResource for least-privilege field filtering.
+     *
+     * @return Collection<int, Registration>
      */
-    public function searchForCheckIn(string $eventId, string $keyword): array
+    public function searchForCheckIn(string $eventId, string $keyword): Collection
     {
         return Registration::where('event_id', $eventId)
             ->where(function ($q) use ($keyword) {
@@ -185,7 +190,6 @@ class CheckInService
             })
             ->with(['participant', 'ticket'])
             ->limit(20)
-            ->get()
-            ->toArray();
+            ->get();
     }
 }

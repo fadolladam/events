@@ -66,6 +66,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | 2026-09-09 | #51 + #52 Perf & indexes | ✅ killed the event-list N+1 (`withCount` on `index`/`publicEvents`); `EventListPerformanceTest` (fixed query count vs. dataset size); `2026_09_09_000002_add_query_hotpath_indexes` (waitlist order, answer lookups, audit tab, event_staff, checkin time). |
 | 2026-09-09 | #54 Expand test suite | ✅ `RbacMatrixTest` (endpoint × 6 roles + no-auth), `DuplicateRegistrationTest`, `AttendanceTest`, `RateLimitTest`; rest of the E§48 list already covered by existing suites. **Tier 4 complete.** Suite: 152. |
 | 2026-09-09 | #57 + #58 Housekeeping | ✅ dropped the never-used `system_settings` table (reversible migration + model removed); rewrote `stack.md` to the real stack; archived superseded reports (`audit.md`, `debug.md`, `qa-report.md`, `GAP-REPORT*.md`) into `docs/archive/`. **Tier 5 complete.** Suite: 152. |
+| 2026-09-10 | #12 API Resources / DTOs | ◐ `RoleRank` + `ParticipantResource`/`RegistrationResource`, wired into `checkin/*` + `attendance` endpoints only — scope narrowed after confirming the scanner card + Attendance Roster tab intentionally show name/email/employee_id/department to `checkin_staff`; only unused `phone`/`country`/`organization` are now hidden below registration_officer, and `answers` is never included on these routes. `RegistrationController`/`ParticipantController`/`WaitlistController`/`SearchController` left on raw models (no privilege gap there today). `LeastPrivilegeApiResourcesTest` (7). **Tier 1 complete.** Suite: 159. |
 
 ---
 
@@ -74,7 +75,7 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
 | Tier | Done | Partial | Open / N-A |
 |---|---|---|---|
 | **0 Blockers** | #2, #3 | — | #1 ❌ retired — **TIER COMPLETE** |
-| **1 Security** | #4, #5, #6, #9, #10, #11, #13, #14, #15 | #7, #8, #16, #17 | #12 |
+| **1 Security** | #4, #5, #6, #9, #10, #11, #13, #14, #15 | #7, #8, #12, #16, #17 | — **TIER COMPLETE** |
 | **2 Core** | #19–#27, #29, #30 | #18(timeline), #23(file), #27(10-step), #28(dyn-status) | — **TIER COMPLETE** |
 | **3 Admin/Dash** | #31–#33, #35–#39, #41–#43 | #34(dedicated waitlist/checkin report views) | #40 ❌ — **TIER COMPLETE** |
 | **4 Production** | #37(CI), #44–#55 | — | — **TIER COMPLETE** |
@@ -157,9 +158,23 @@ Source refs: `PRD §` = `prd.md`; `E§` = the former `implementations-2.md`.
   authz outcome 200-ish / 403 / 401). _E§6, §49_
 
 ### API / data protection
-- ☐ **12. API Resources / DTOs** — stop returning raw Eloquent models; least-
-  privilege fields. Participant email / phone / employee_id / department /
-  answers are currently exposed wherever a registration is returned. _E§14_
+- ◐ **12. API Resources / DTOs** — `RoleRank` (role-hierarchy helper) +
+  `ParticipantResource` / `RegistrationResource` (`App\Http\Resources`), wired
+  into the check-in/attendance endpoints checkin_staff shares with higher
+  roles (`checkin/scan`, `checkin/undo`, `checkin/search`, `checkin/recent`,
+  `attendance` index + mark). Scope was narrowed deliberately after checking
+  the frontend: the QR scanner card and Attendance Roster tab already show
+  participant name/email/employee_id/department to checkin_staff on purpose
+  (identity verification at the door), so those stay. Only `phone` /
+  `country` / `organization` (never rendered by any check-in-tier screen) are
+  now reserved for registration_officer+, and free-text form `answers` are
+  never included on these endpoints regardless of role. `LeastPrivilegeApiResourcesTest`
+  (7 cases). OPEN: `RegistrationController`/`ParticipantController`/
+  `WaitlistController` (registration_officer+ only, no privilege differential
+  to enforce) and `SearchController` (email/employee_id already shown to
+  `viewer` by an existing GlobalSearch UI, same reasoning as above — left
+  alone, not audited further) still return raw models; revisit only if a
+  broader role gets access to either. _E§14_
 - ✅ **13. Rate-limiting gaps** — throttles added in `routes/api.php`: public
   ticket lookup 30/min, QR image 60/min, check-in scan/process 240/min,
   undo/search 120/min, CSV/PDF export 20/min, `POST /users` 20/min. Check-in

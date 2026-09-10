@@ -31,6 +31,8 @@ class DatabaseSeeder extends Seeder
             throw new \RuntimeException('DatabaseSeeder carries demo credentials and must not run in production.');
         }
 
+        $this->copySeedAssets();
+
         // Reusable registration-form templates (idempotent, safe on every boot)
         $this->call(FormTemplateSeeder::class);
         $this->call(EventTemplateSeeder::class);
@@ -481,6 +483,35 @@ class DatabaseSeeder extends Seeder
 
         foreach ($footballFields as $f) {
             FormField::create(array_merge($f, ['form_id' => $footballForm->id]));
+        }
+    }
+
+    /**
+     * Copy the tracked demo cover images (database/seed-assets/) into
+     * storage/app/public/, so a fresh install — Docker, XAMPP, or local —
+     * renders the real Blood Donation / Marathon thumbnails this seeder's
+     * cover_image_url values point at, instead of a broken image or having
+     * someone re-upload them by hand. Never overwrites an existing file, so
+     * a real admin upload always wins over the bundled demo asset.
+     */
+    private function copySeedAssets(): void
+    {
+        $src = database_path('seed-assets/event-covers');
+        $dest = storage_path('app/public/event-covers');
+
+        if (! is_dir($src)) {
+            return;
+        }
+
+        if (! is_dir($dest)) {
+            mkdir($dest, 0775, true);
+        }
+
+        foreach (glob($src.'/*') as $file) {
+            $target = $dest.'/'.basename($file);
+            if (! file_exists($target)) {
+                copy($file, $target);
+            }
         }
     }
 }

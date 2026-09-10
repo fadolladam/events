@@ -53,7 +53,9 @@ php artisan migrate --seed
 **B. phpMyAdmin import** — in phpMyAdmin select the `events` database → *Import*
 → choose `install/events.sql` → *Go*.
 
-Both give you the same five logins (all password **`password123`**):
+**A** gives you all six current roles (all password **`password123`**), each
+already on the team for every seeded demo event, and copies the real demo
+cover images into `storage/app/public/` automatically:
 
 | Role | Email |
 |------|-------|
@@ -62,6 +64,12 @@ Both give you the same five logins (all password **`password123`**):
 | Event Organizer | `organizer@rhbgroup.com` |
 | Registration Officer | `registration@rhbgroup.com` |
 | Check-In Staff | `staff@rhbgroup.com` |
+| Viewer | `viewer@rhbgroup.com` |
+
+**B** (`install/events.sql`) is an older static snapshot — only the first
+five accounts, three demo events (Badminton, Blood Donation, Angkor Wat
+marathon), no `viewer` row. Prefer **A** unless you specifically need that
+fixed snapshot.
 
 ---
 
